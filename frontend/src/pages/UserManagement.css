@@ -1,0 +1,262 @@
+.user-management {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.users-header h2 {
+  color: #FFFFFF;
+  margin-bottom: 0.5rem;
+  font-size: 1.8rem;
+}
+
+.users-header p {
+  color: #B9BBBE;
+  font-size: 0.95rem;
+}
+
+.users-message {
+  color: #B9BBBE;
+  font-size: 0.95rem;
+}
+
+.users-loading {
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #36393F;
+  border-top-color: #7289DA;
+  border-radius: 50%;
+  animation: user-spinner-spin 0.8s linear infinite;
+}
+
+@keyframes user-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.user-card-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.user-card {
+  background: #2F3136;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  border: 1px solid #202225;
+  display: grid;
+  grid-template-columns: 56px 1fr 160px 56px;
+  gap: 1.25rem;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.user-card:hover {
+  background: #36393F;
+  border-color: #72767d;
+}
+
+.user-avatar-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #36393F;
+  border: 2px solid #4f545c;
+}
+
+.user-avatar-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.user-name {
+  margin: 0;
+  color: #FFFFFF;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-self-badge {
+  background: #7289DA;
+  color: #FFFFFF;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+}
+
+.user-handle {
+  margin: 0;
+  color: #72767d;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.user-provider-badge {
+  color: #B9BBBE;
+  font-size: 0.8rem;
+}
+
+.user-role-badge {
+  display: inline-block;
+  background: #36393F;
+  color: #B9BBBE;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.user-role-badge.admin {
+  background: rgba(67, 181, 129, 0.15);
+  color: #43B581;
+}
+
+.user-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.user-actions .action-button {
+  background: transparent;
+  border: none;
+  color: #B9BBBE;
+  cursor: pointer;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.user-actions .action-button:hover:not(:disabled) {
+  background: #36393F;
+  color: #FFFFFF;
+}
+
+.user-actions .action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.user-settings-panel {
+  background: #2F3136;
+  border: 1px solid #202225;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.user-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-settings-row label {
+  color: #B9BBBE;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.user-settings-row select {
+  background: #202225;
+  border: 1px solid #36393F;
+  color: #FFFFFF;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.user-settings-save {
+  background: #43B581;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.user-settings-save:hover:not(:disabled) {
+  background: #3CA374;
+}
+
+.user-settings-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.user-delete-button {
+  background: transparent;
+  color: #F04747;
+  border: 1px solid #F04747;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-delete-button:hover:not(:disabled) {
+  background: #F04747;
+  color: #FFFFFF;
+}
+
+.user-delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.user-settings-error {
+  margin: 0;
+  color: #F04747;
+  font-size: 0.85rem;
+}

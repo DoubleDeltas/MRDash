@@ -1,0 +1,19 @@
+node_modules/
+.env
+.env.local
+
+# frontend
+frontend/dist/
+frontend/scripts/screenshots/
+
+# backend
+backend/logs/
+
+# bridge (Java desktop app, not part of web deploy)
+bridge/target/
+bridge/*.dat
+bridge/dependency-reduced-pom.xml
+
+# OS/editor
+.DS_Store
+*.log

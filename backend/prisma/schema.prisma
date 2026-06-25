@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  LOCAL
+  DISCORD
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id              String        @id @default(uuid())
+  provider        AuthProvider
+  providerId      String
+  localPwHash     String?
+  avatarUrl       String?
+  handle          String?
+  nickname        String?
+  role            UserRole      @default(USER)
+  isMrdAuthorized Boolean       @default(false)
+  ownedServers    MinecraftServer[]
+  managedServers  MinecraftServer[] @relation("ServerManagers")
+
+  @@unique([provider, providerId], name: "provider_user_unique")
+}
+
+enum MinecraftPlatform {
+  VANILLA
+  FORGE
+  NEOFORGE
+  FABRIC
+  QUILT
+}
+
+model MinecraftServer {
+  id           Int               @id @default(autoincrement())
+  name         String
+  description  String?
+  address      String
+  image        Bytes?
+  color        String?
+  consoleToken String?
+  mcVersion    String
+  mcPlatform   MinecraftPlatform
+  ownerId      String?
+  owner        User?             @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  managers     User[]            @relation("ServerManagers")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}

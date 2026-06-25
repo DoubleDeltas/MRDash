@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Command docker -ErrorAction SilentlyContinue; Get-Service | Where-Object { $_.Name -match 'mysql|redis|docker' } | Select-Object Name, Status; Get-Process | Where-Object { $_.ProcessName -match 'mysql|redis|docker' } | Select-Object ProcessName)"
+    ]
+  }
+}
