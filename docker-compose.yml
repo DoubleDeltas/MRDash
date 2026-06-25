@@ -1,0 +1,24 @@
+services:
+  backend:
+    image: ghcr.io/doubledeltas/mrd-backend:latest
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "3000"
+
+  frontend:
+    image: ghcr.io/doubledeltas/mrd-frontend:latest
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/mrd.conf:/etc/nginx/conf.d/mrd.conf:ro
+    depends_on:
+      - frontend
+      - backend

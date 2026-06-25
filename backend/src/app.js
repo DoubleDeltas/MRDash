@@ -8,6 +8,13 @@ import { sessionRedis } from './config/session-redis.js';
 
 export const createApp = () => {
   const app = express();
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // nginx 리버스 프록시 뒤에서 돌 때, req.secure/X-Forwarded-* 헤더를 신뢰해야
+  // 세션 쿠키의 secure 옵션이 제대로 동작한다.
+  if (isProduction) {
+    app.set('trust proxy', 1);
+  }
 
   // Middleware
   app.use(cors({
@@ -26,7 +33,9 @@ export const createApp = () => {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: Number(process.env.SESSION_COOKIE_MAX_AGE)
+      maxAge: Number(process.env.SESSION_COOKIE_MAX_AGE),
+      secure: isProduction,
+      sameSite: 'lax'
     }
   }));
   
