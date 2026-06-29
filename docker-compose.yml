@@ -5,12 +5,24 @@ services:
     env_file: .env
     expose:
       - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ddeltas-net
+      - mrd-net
 
   frontend:
     image: ghcr.io/doubledeltas/mrd-frontend:latest
     restart: unless-stopped
     expose:
       - "80"
+    networks:
+      - ddeltas-net
+      - mrd-net
 
   nginx:
     image: nginx:alpine
@@ -22,3 +34,11 @@ services:
     depends_on:
       - frontend
       - backend
+    networks:
+      - ddeltas-net
+      - mrd-net
+      
+networks:
+  mrd-net:
+  ddeltas-net:
+    external: true
