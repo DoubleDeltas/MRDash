@@ -40,7 +40,7 @@ function App() {
     
     return {
       breadcrumbs: [
-        { title: page?.title || 'MRD', path: null, icon: page?.icon || null }
+        { title: page?.title || 'MRDash', path: null, icon: page?.icon || null }
       ]
     }
   }

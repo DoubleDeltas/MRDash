@@ -14,7 +14,7 @@ router.use('/users', userRoutes);
 
 // 기본 라우트
 router.get('/', (req, res) => {
-  res.json({ message: 'MRD Backend API v1.0', timestamp: new Date().toISOString() });
+  res.json({ message: 'MRDash Backend API v1.0', timestamp: new Date().toISOString() });
 });
 
 export default router;

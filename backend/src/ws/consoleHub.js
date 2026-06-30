@@ -79,7 +79,7 @@ const handleBrowserConnection = (ws, serverId) => {
     if (msg.type === 'command' && typeof msg.command === 'string') {
       const agentWs = agentSockets.get(serverId);
       if (!agentWs) {
-        send(ws, { type: 'error', message: 'MRD 브리지가 연결되어 있지 않습니다.' });
+        send(ws, { type: 'error', message: 'MRDash 브리지가 연결되어 있지 않습니다.' });
         return;
       }
       send(agentWs, { type: 'command', command: msg.command });

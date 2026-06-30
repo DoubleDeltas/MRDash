@@ -1,4 +1,4 @@
-# MRD Backend
+# MRDash Backend
 
 REST API 백엔드 (Express + Prisma + MySQL)
 

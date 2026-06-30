@@ -66,8 +66,8 @@
             <configuration>
               <headerType>gui</headerType>
               <jar>${project.build.directory}/mrd-bridge.jar</jar>
-              <outfile>${project.build.directory}/MRD-Bridge.exe</outfile>
-              <errTitle>MRD Bridge</errTitle>
+              <outfile>${project.build.directory}/MRDash-Bridge.exe</outfile>
+              <errTitle>MRDash Bridge</errTitle>
               <classPath>
                 <mainClass>com.doubledeltas.mrdbridge.Main</mainClass>
               </classPath>

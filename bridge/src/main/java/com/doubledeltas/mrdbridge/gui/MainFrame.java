@@ -32,7 +32,7 @@ public class MainFrame extends JFrame {
     private boolean showingDuplicateKeyMessage = false;
 
     public MainFrame(BridgeStore store) {
-        super("MRD Bridge");
+        super("MRDash Bridge");
         this.store = store;
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);

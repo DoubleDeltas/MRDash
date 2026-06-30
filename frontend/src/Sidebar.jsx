@@ -25,7 +25,7 @@ function Sidebar({ isOpen, toggleSidebar, isMobile }) {
           </button>
 
           <div className="sidebar-header">
-            <h2>MRD</h2>
+            <h2>MRDash</h2>
             <p className="sidebar-subtitle">MARENDI RAILWAY DASHBOARD</p>
           </div>
 

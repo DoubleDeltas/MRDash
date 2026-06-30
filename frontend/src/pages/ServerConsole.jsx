@@ -83,7 +83,7 @@ function ServerConsole() {
     <div className="server-console">
       <div className="console-status">
         <span className={`console-status-dot ${wsConnected && agentConnected ? 'online' : 'offline'}`} />
-        {!wsConnected ? '서버에 연결하는 중...' : agentConnected ? 'MRD 브리지 연결됨' : 'MRD 브리지가 연결되어 있지 않습니다'}
+        {!wsConnected ? '서버에 연결하는 중...' : agentConnected ? 'MRDash 브리지 연결됨' : 'MRDash 브리지가 연결되어 있지 않습니다'}
       </div>
 
       <div className="console-output">
