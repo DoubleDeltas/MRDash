@@ -48,8 +48,8 @@ jobs:
           context: ./frontend
           push: true
           build-args: |
-            VITE_API_BASE_URL=https://doubledeltas.kro.kr/mrd-api/api
-            VITE_BASE_PATH=/mrd/
+            VITE_API_BASE_URL=https://dash.ddeltas.kro.kr/api
+            VITE_BASE_PATH=/
           tags: |
             ghcr.io/doubledeltas/mrd-frontend:latest
             ghcr.io/doubledeltas/mrd-frontend:${{ github.sha }}
