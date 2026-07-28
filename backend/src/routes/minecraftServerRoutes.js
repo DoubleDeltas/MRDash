@@ -12,7 +12,7 @@ router.get('/:id/image', getImage);
 router.get('/:id/status', getStatus);
 router.post('/', requireAdmin, create);
 router.put('/:id', requireAdminOrOwner, update);
-router.delete('/:id', requireAdmin, deleteServer);
+router.delete('/:id', requireAdminOrOwner, deleteServer);
 router.post('/:id/console-token', requireAdminOrOwner, issueConsoleToken);
 
 export default router;

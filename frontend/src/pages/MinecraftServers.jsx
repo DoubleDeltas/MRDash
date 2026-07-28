@@ -166,6 +166,8 @@ function MinecraftServers() {
   const [issuedToken, setIssuedToken] = useState(null)
   const [issuingToken, setIssuingToken] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
+  const [deleteConfirmServer, setDeleteConfirmServer] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const loadServers = async () => {
     const res = await apiClient.get('/servers')
@@ -275,6 +277,23 @@ function MinecraftServers() {
 
   const handleEditFormChange = (e) => {
     setEditForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmServer) return
+    setDeleting(true)
+    try {
+      await apiClient.delete(`/servers/${deleteConfirmServer.id}`)
+      setServers(prev => prev.filter(s => s.id !== deleteConfirmServer.id))
+      setEditingId(null)
+      setIssuedToken(null)
+      setDeleteConfirmServer(null)
+    } catch (err) {
+      setEditError(err.response?.data?.error || '서버 삭제에 실패했습니다.')
+      setDeleteConfirmServer(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const handleEditSubmit = async (e, serverId) => {
@@ -571,6 +590,14 @@ function MinecraftServers() {
                   <button type="submit" className="server-form-submit" disabled={editSubmitting}>
                     {editSubmitting ? '저장하는 중...' : '저장'}
                   </button>
+                  <button
+                    type="button"
+                    className="server-form-delete"
+                    disabled={!isAdmin && !isOwner(server)}
+                    onClick={() => setDeleteConfirmServer(server)}
+                  >
+                    삭제
+                  </button>
                   <button type="button" className="server-form-cancel" onClick={() => { setEditingId(null); setIssuedToken(null) }}>
                     취소
                   </button>
@@ -581,6 +608,23 @@ function MinecraftServers() {
           )
         })}
       </div>
+      {deleteConfirmServer && (
+        <div className="delete-confirm-overlay" onClick={() => setDeleteConfirmServer(null)}>
+          <div className="delete-confirm-modal" onClick={e => e.stopPropagation()}>
+            <p className="delete-confirm-message">
+              정말로 <strong>{deleteConfirmServer.name}</strong> 서버를 삭제할까요?
+            </p>
+            <div className="delete-confirm-actions">
+              <button className="delete-confirm-ok" onClick={handleDeleteConfirm} disabled={deleting}>
+                {deleting ? '삭제 중...' : '삭제'}
+              </button>
+              <button className="delete-confirm-cancel" onClick={() => setDeleteConfirmServer(null)} disabled={deleting}>
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
