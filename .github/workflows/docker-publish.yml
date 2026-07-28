@@ -50,6 +50,7 @@ jobs:
           build-args: |
             VITE_API_BASE_URL=https://dash.ddeltas.kro.kr/api
             VITE_BASE_PATH=/
+            VITE_URL_MZPEDIA=https://mzpedia.kro.kr/wiki/index.php/%EB%8C%80%EB%AC%B8
           tags: |
             ghcr.io/doubledeltas/mrd-frontend:latest
             ghcr.io/doubledeltas/mrd-frontend:${{ github.sha }}

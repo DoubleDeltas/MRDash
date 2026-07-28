@@ -66,7 +66,7 @@ function Main() {
             <span className="material-icons">view_in_ar</span>
             <span>마인크래프트</span>
           </a>
-          <a href="https://mzpedia.kro.kr/wiki/index.php/%EB%8C%80%EB%AC%B8" target="_blank" rel="noopener noreferrer" className="quick-link">
+          <a href={import.meta.env.VITE_URL_MZPEDIA} target="_blank" rel="noopener noreferrer" className="quick-link">
             <span className="material-icons">book</span>
             <span>마랜디위키</span>
           </a>
