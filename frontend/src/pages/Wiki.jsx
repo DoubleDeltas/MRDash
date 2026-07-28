@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 export default function Wiki() {
     useEffect(() => {
-        window.open(import.meta.env.VITE_URL_MZPEDIA);
+        window.open(window.__env?.VITE_URL_MZPEDIA);
     }, []);
     return null;
 }
