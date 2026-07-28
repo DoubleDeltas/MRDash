@@ -87,13 +87,8 @@ function ServerConsole() {
         {!wsConnected ? '서버에 연결하는 중...' : agentConnected ? 'MRDash 브리지 연결됨' : 'MRDash 브리지가 연결되어 있지 않습니다'}
       </div>
 
-      <div className="console-output">
-        <textarea
-          ref={consoleRef}
-          readOnly
-          value={consoleLogs.join('\n')}
-          className="console-logs"
-        />
+      <div className="console-output" ref={consoleRef}>
+        <pre className="console-logs">{consoleLogs.join('\n')}</pre>
       </div>
 
       <form onSubmit={handleCommandSubmit} className="console-input-form">
