@@ -9,7 +9,7 @@ function ServerConsole() {
   const [command, setCommand] = useState('')
   const [agentConnected, setAgentConnected] = useState(false)
   const [wsConnected, setWsConnected] = useState(false)
-  const consoleEndRef = useRef(null)
+  const consoleRef = useRef(null)
   const wsRef = useRef(null)
 
   useEffect(() => {
@@ -66,7 +66,8 @@ function ServerConsole() {
   }, [serverId])
 
   useEffect(() => {
-    consoleEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = consoleRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [consoleLogs])
 
   const handleCommandSubmit = (e) => {
@@ -88,11 +89,11 @@ function ServerConsole() {
 
       <div className="console-output">
         <textarea
+          ref={consoleRef}
           readOnly
           value={consoleLogs.join('\n')}
           className="console-logs"
         />
-        <div ref={consoleEndRef} />
       </div>
 
       <form onSubmit={handleCommandSubmit} className="console-input-form">
