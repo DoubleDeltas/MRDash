@@ -480,14 +480,18 @@ function MinecraftServers() {
                 {(isAdmin || isOwner(server) || isManager(server)) && (() => {
                   const agentConnected = agentStatuses[server.id] === true
                   return (
-                    <button
-                      className="action-button"
+                    <div
+                      className="action-button-wrapper"
                       onMouseEnter={() => setHoveredButtonId(`console-${server.id}`)}
                       onMouseLeave={() => setHoveredButtonId(null)}
-                      onClick={() => agentConnected && handleConsoleClick(server.id)}
-                      disabled={!agentConnected}
                     >
-                      <span className="material-icons">terminal</span>
+                      <button
+                        className="action-button"
+                        onClick={() => handleConsoleClick(server.id)}
+                        disabled={!agentConnected}
+                      >
+                        <span className="material-icons">terminal</span>
+                      </button>
                       {hoveredButtonId === `console-${server.id}` && (
                         <div className="action-tooltip">
                           {agentConnected
@@ -495,7 +499,7 @@ function MinecraftServers() {
                             : 'MRDash 브리지가 연결되어 있지 않아 콘솔에 접속할 수 없습니다.'}
                         </div>
                       )}
-                    </button>
+                    </div>
                   )
                 })()}
 
