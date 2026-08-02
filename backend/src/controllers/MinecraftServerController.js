@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { MinecraftPlatform } from '@prisma/client';
 import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
+import { isAgentConnected } from '../ws/consoleHub.js';
 
 // 응답에는 원본 image bytes/consoleToken 대신 보유 여부만 내려주고,
 // managers 관계는 id 배열(managerIds)로 평탄화해서 내려준다
@@ -222,6 +223,12 @@ export const update = async (req, res) => {
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
+};
+
+// 브리지 에이전트 연결 여부 조회
+export const getAgentStatus = (req, res) => {
+  const serverId = parseInt(req.params.id);
+  res.json({ success: true, data: { connected: isAgentConnected(serverId) } });
 };
 
 // 서버 삭제

@@ -152,6 +152,7 @@ function MinecraftServers() {
   const [hoveredServerId, setHoveredServerId] = useState(null)
   const [hoveredPlayersId, setHoveredPlayersId] = useState(null)
   const [statuses, setStatuses] = useState({})
+  const [agentStatuses, setAgentStatuses] = useState({})
 
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -174,16 +175,23 @@ function MinecraftServers() {
     const list = res.data.data
     setServers(list)
 
-    const results = await Promise.allSettled(
-      list.map(server => apiClient.get(`/servers/${server.id}/status`))
-    )
+    const [statusResults, agentResults] = await Promise.all([
+      Promise.allSettled(list.map(server => apiClient.get(`/servers/${server.id}/status`))),
+      Promise.allSettled(list.map(server => apiClient.get(`/servers/${server.id}/agent-status`))),
+    ])
+
     const newStatuses = {}
-    results.forEach((result, i) => {
-      newStatuses[list[i].id] = result.status === 'fulfilled'
-        ? result.value.data.data
+    const newAgentStatuses = {}
+    list.forEach((server, i) => {
+      newStatuses[server.id] = statusResults[i].status === 'fulfilled'
+        ? statusResults[i].value.data.data
         : { online: false }
+      newAgentStatuses[server.id] = agentResults[i].status === 'fulfilled'
+        ? agentResults[i].value.data.data.connected
+        : false
     })
     setStatuses(newStatuses)
+    setAgentStatuses(newAgentStatuses)
   }
 
   useEffect(() => {
@@ -469,20 +477,27 @@ function MinecraftServers() {
               </div>
 
               <div className="server-actions">
-                {(isAdmin || isOwner(server) || isManager(server)) && (
-                  <button
-                    className="action-button"
-                    onMouseEnter={() => setHoveredButtonId(`console-${server.id}`)}
-                    onMouseLeave={() => setHoveredButtonId(null)}
-                    onClick={() => handleConsoleClick(server.id)}
-                    title="콘솔 접속"
-                  >
-                    <span className="material-icons">terminal</span>
-                    {hoveredButtonId === `console-${server.id}` && (
-                      <div className="action-tooltip">콘솔 접속</div>
-                    )}
-                  </button>
-                )}
+                {(isAdmin || isOwner(server) || isManager(server)) && (() => {
+                  const agentConnected = agentStatuses[server.id] === true
+                  return (
+                    <button
+                      className="action-button"
+                      onMouseEnter={() => setHoveredButtonId(`console-${server.id}`)}
+                      onMouseLeave={() => setHoveredButtonId(null)}
+                      onClick={() => agentConnected && handleConsoleClick(server.id)}
+                      disabled={!agentConnected}
+                    >
+                      <span className="material-icons">terminal</span>
+                      {hoveredButtonId === `console-${server.id}` && (
+                        <div className="action-tooltip">
+                          {agentConnected
+                            ? '콘솔 접속'
+                            : 'MRDash 브리지가 연결되어 있지 않아 콘솔에 접속할 수 없습니다.'}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })()}
 
                 {(isAdmin || isOwner(server)) && (
                   <button

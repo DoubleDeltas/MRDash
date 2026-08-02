@@ -97,6 +97,8 @@ const handleBrowserConnection = (ws, serverId) => {
   });
 };
 
+export const isAgentConnected = (serverId) => agentSockets.has(serverId);
+
 export const attachConsoleHub = (httpServer) => {
   const wss = new WebSocketServer({ noServer: true });
 
