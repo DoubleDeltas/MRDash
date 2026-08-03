@@ -42,7 +42,7 @@ public class WatcherProcessManager implements AutoCloseable {
     }
 
     public void startDockerAttach(String containerId, OutputHandler outputHandler, ExitHandler exitHandler) throws IOException {
-        startCommand(List.of("docker", "attach", containerId), outputHandler, exitHandler);
+        startCommand(List.of("docker", "attach", "--sig-proxy=false", containerId), outputHandler, exitHandler);
     }
 
     private void startCommand(List<String> command, OutputHandler outputHandler, ExitHandler exitHandler) throws IOException {
