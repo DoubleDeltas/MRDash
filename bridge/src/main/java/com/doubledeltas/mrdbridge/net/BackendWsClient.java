@@ -137,9 +137,14 @@ public class BackendWsClient {
     }
 
     public void close() {
+        close("bridge closing");
+    }
+
+    /** reason은 그대로 close 프레임에 실려 백엔드 로그에 찍히므로, 호출부마다 구분되는 값을 넘겨야 한다. */
+    public void close(String reason) {
         WebSocket ws = this.webSocket;
         if (ws != null) {
-            ws.sendClose(WebSocket.NORMAL_CLOSURE, "bridge closing");
+            ws.sendClose(WebSocket.NORMAL_CLOSURE, reason);
         }
     }
 
