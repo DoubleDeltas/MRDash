@@ -52,7 +52,8 @@ const handleAgentConnection = async (ws, url) => {
     }
   });
 
-  ws.on('close', () => {
+  ws.on('close', (code, reason) => {
+    console.log(`[ws/agent] server ${server.id} agent disconnected: code=${code} reason=${reason}`);
     if (agentSockets.get(server.id) === ws) {
       agentSockets.delete(server.id);
       broadcastToBrowsers(server.id, { type: 'agent-status', connected: false });
