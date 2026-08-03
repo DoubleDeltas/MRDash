@@ -11,7 +11,10 @@ backend/logs/
 
 # bridge (Java desktop app, not part of web deploy)
 bridge/target/
+bridge/build/
+bridge/.gradle/
 bridge/*.dat
+bridge/*.exe
 bridge/dependency-reduced-pom.xml
 
 # OS/editor

@@ -1,5 +1,7 @@
 package com.doubledeltas.mrdbridge.os;
 
+import com.doubledeltas.mrdbridge.os.linux.LinuxConsoleBridge;
+import com.doubledeltas.mrdbridge.os.linux.LinuxPortProcessFinder;
 import com.doubledeltas.mrdbridge.os.win.WindowsConsoleBridge;
 import com.doubledeltas.mrdbridge.os.win.WindowsPortProcessFinder;
 
@@ -35,8 +37,7 @@ public final class OsSupport {
         if (osName.contains("win")) {
             return new OsSupport(WindowsPortProcessFinder::new, WindowsConsoleBridge::new);
         }
-        // 지금은 Windows만 지원한다. Linux/Mac을 추가하려면 여기에 분기를 더하면 된다.
-        throw new UnsupportedOperationException(
-                "지원하지 않는 OS입니다: " + osName + " (현재는 Windows만 지원)");
+        // Linux/Mac: DOCKER 타입은 정상 동작, LOCAL 타입은 LinuxConsoleBridge에서 명확한 오류를 냄
+        return new OsSupport(LinuxPortProcessFinder::new, LinuxConsoleBridge::new);
     }
 }

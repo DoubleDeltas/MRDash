@@ -54,10 +54,14 @@ public class MainFrame extends JFrame {
         JButton refreshButton = new JButton("새로고침");
         refreshButton.addActionListener(e -> onRefreshClicked());
 
+        JButton settingsButton = new JButton("설정");
+        settingsButton.addActionListener(e -> SettingsDialog.show(this, store));
+
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
         top.add(addLocalButton);
         top.add(addDockerButton);
         top.add(refreshButton);
+        top.add(settingsButton);
 
         errorLabel.setForeground(Color.RED);
         errorLabel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));

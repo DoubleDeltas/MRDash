@@ -1,0 +1,55 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'edu.sc.seis.launch4j' version '3.0.6'
+}
+
+group = 'com.doubledeltas'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+compileJava.options.encoding = 'UTF-8'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'net.java.dev.jna:jna:5.14.0'
+    implementation 'net.java.dev.jna:jna-platform:5.14.0'
+}
+
+shadowJar {
+    archiveBaseName = 'mrd-bridge'
+    archiveClassifier = ''
+    archiveVersion = ''
+    manifest {
+        attributes 'Main-Class': 'com.doubledeltas.mrdbridge.Main'
+    }
+}
+
+launch4j {
+    mainClassName = 'com.doubledeltas.mrdbridge.Main'
+    headerType = 'gui'
+    jarTask = tasks.shadowJar
+    outfile = 'MRDash-Bridge.exe'
+    errTitle = 'MRDash Bridge'
+    jreMinVersion = '17'
+}
+
+// CLI 전용 EXE: console 헤더라 stdout/stderr이 터미널에 붙는다 (GUI는 뜨지 않는 모드에서 쓸 것)
+tasks.register('createCliExe', edu.sc.seis.launch4j.tasks.Launch4jLibraryTask) {
+    mainClassName = 'com.doubledeltas.mrdbridge.Main'
+    headerType = 'console'
+    jarTask = tasks.shadowJar
+    outfile = 'mrd-bridge.exe'
+    errTitle = 'MRDash Bridge'
+    jreMinVersion = '17'
+    jvmOptions = ['-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8']
+}
+
+assemble.dependsOn shadowJar

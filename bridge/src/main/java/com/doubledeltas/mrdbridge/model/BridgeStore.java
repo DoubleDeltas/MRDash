@@ -21,7 +21,7 @@ import java.util.Properties;
  */
 public class BridgeStore {
 
-    private static final String DEFAULT_BACKEND_WS_URL = "ws://localhost:3000";
+    private static final String DEFAULT_BACKEND_WS_URL = "wss://dash.ddeltas.kro.kr";
     private static final String FILE_NAME = "mrd-bridge.dat";
 
     private final File file;
@@ -46,6 +46,11 @@ public class BridgeStore {
 
     public String getBackendWsUrl() {
         return backendWsUrl;
+    }
+
+    public void setBackendWsUrl(String url) {
+        this.backendWsUrl = url;
+        save();
     }
 
     public List<ServerEntry> getServers() {

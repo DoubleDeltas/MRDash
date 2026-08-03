@@ -1,5 +1,6 @@
 package com.doubledeltas.mrdbridge;
 
+import com.doubledeltas.mrdbridge.cli.CliDispatcher;
 import com.doubledeltas.mrdbridge.gui.MainFrame;
 import com.doubledeltas.mrdbridge.model.BridgeStore;
 import com.doubledeltas.mrdbridge.os.win.ConsoleWatcherMain;
@@ -15,6 +16,11 @@ public final class Main {
         if (args.length >= 2 && "--watch".equals(args[0])) {
             long pid = Long.parseLong(args[1]);
             ConsoleWatcherMain.run(pid);
+            return;
+        }
+
+        if (args.length >= 1) {
+            CliDispatcher.dispatch(args);
             return;
         }
 
