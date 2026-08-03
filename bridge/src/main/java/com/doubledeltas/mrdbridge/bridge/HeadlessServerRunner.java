@@ -107,7 +107,8 @@ public class HeadlessServerRunner {
                 connected -> {
                     if (!firstResult.isDone()) {
                         firstResult.complete(connected);
-                    } else if (!connected) {
+                    } else if (!connected && client == wsClient) {
+                        // wsClient가 이미 null이거나 다른 연결로 교체됐으면 이 이벤트는 오래된 것 — 무시
                         log("백엔드 연결이 끊어졌습니다. 재시도 중...");
                         scheduleReconnect();
                     }
@@ -168,9 +169,11 @@ public class HeadlessServerRunner {
 
     private void closeExistingConnection() {
         BackendWsClient c = wsClient;
-        if (c != null) { c.close(); wsClient = null; }
+        wsClient = null;
+        if (c != null) { c.close(); }
         WatcherProcessManager w = watcher;
-        if (w != null) { w.close(); watcher = null; }
+        watcher = null;
+        if (w != null) { w.close(); }
     }
 
     private void log(String message) {

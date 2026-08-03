@@ -376,7 +376,8 @@ public class ServerRowPanel extends JPanel {
         }, connected -> {
             if (!firstResult.isDone()) {
                 firstResult.complete(connected);
-            } else if (!connected) {
+            } else if (!connected && client == wsClient) {
+                // wsClient가 이미 null이거나 다른 연결로 교체됐으면 이 이벤트는 오래된 것 — 무시
                 online = false;
                 SwingUtilities.invokeLater(this::refreshDotDisplay);
                 scheduleReconnect();
@@ -433,10 +434,9 @@ public class ServerRowPanel extends JPanel {
         if (!running || this.watcher != diedWatcher) {
             return;
         }
-        if (wsClient != null) {
-            wsClient.close();
-            wsClient = null;
-        }
+        BackendWsClient c = wsClient;
+        wsClient = null;
+        if (c != null) { c.close(); }
         this.watcher = null;
         online = false;
         SwingUtilities.invokeLater(this::refreshDotDisplay);
@@ -474,14 +474,12 @@ public class ServerRowPanel extends JPanel {
 
     /** 재시도 직전에 남아있을 수 있는 이전 연결/와처를 정리한다 (안 그러면 재연결마다 watcher 프로세스가 쌓인다). */
     private void closeExistingConnection() {
-        if (wsClient != null) {
-            wsClient.close();
-            wsClient = null;
-        }
-        if (watcher != null) {
-            watcher.close();
-            watcher = null;
-        }
+        BackendWsClient c = wsClient;
+        wsClient = null;
+        if (c != null) { c.close(); }
+        WatcherProcessManager w = watcher;
+        watcher = null;
+        if (w != null) { w.close(); }
     }
 
     private void setCommitted(boolean committed) {
