@@ -58,14 +58,14 @@ public class HeadlessServerRunner {
 
     public void stop() {
         running = false;
-        closeExistingConnection();
+        closeExistingConnection("bridge stopping");
         scheduler.shutdownNow();
     }
 
     private void attemptOnce() {
         if (!running) return;
 
-        closeExistingConnection();
+        closeExistingConnection("reconnect attempt started");
 
         Long pid = null;
         if (entry.getType() == ServerType.LOCAL) {
@@ -141,7 +141,7 @@ public class HeadlessServerRunner {
                 newWatcher.startDockerAttach(entry.getTarget(), client::sendLog, () -> onWatcherDied(newWatcher));
             }
         } catch (Exception e) {
-            client.close();
+            client.close("watcher start failed: " + e.getMessage());
             log("콘솔 watcher 시작 실패: " + e.getMessage() + ". 재시도 중...");
             scheduleReconnect();
             return;
@@ -155,7 +155,7 @@ public class HeadlessServerRunner {
 
     private void onWatcherDied(WatcherProcessManager diedWatcher) {
         if (!running || this.watcher != diedWatcher) return;
-        closeExistingConnection();
+        closeExistingConnection("console watcher died");
         log("콘솔 watcher가 종료되었습니다. 재시도 중...");
         scheduleReconnect();
     }
@@ -167,10 +167,10 @@ public class HeadlessServerRunner {
         scheduler.schedule(this::attemptOnce, delay, TimeUnit.MILLISECONDS);
     }
 
-    private void closeExistingConnection() {
+    private void closeExistingConnection(String reason) {
         BackendWsClient c = wsClient;
         wsClient = null;
-        if (c != null) { c.close(); }
+        if (c != null) { c.close(reason); }
         WatcherProcessManager w = watcher;
         watcher = null;
         if (w != null) { w.close(); }
