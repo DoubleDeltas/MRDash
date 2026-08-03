@@ -6,6 +6,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'bridge/**'
       - '.github/workflows/docker-publish.yml'
 
 permissions:
@@ -53,3 +54,22 @@ jobs:
           tags: |
             ghcr.io/doubledeltas/mrd-frontend:latest
             ghcr.io/doubledeltas/mrd-frontend:${{ github.sha }}
+
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./bridge
+          push: true
+          tags: |
+            ghcr.io/doubledeltas/mrd-bridge:latest
+            ghcr.io/doubledeltas/mrd-bridge:${{ github.sha }}
