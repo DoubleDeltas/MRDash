@@ -56,6 +56,10 @@
   background: #72767d;
 }
 
+.console-output::-webkit-scrollbar-corner {
+  background: #0a0a0a;
+}
+
 .console-logs {
   margin: 0;
   padding: 1rem;
