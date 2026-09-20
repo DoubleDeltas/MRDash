@@ -11,6 +11,8 @@ function ServerConsole() {
   const [wsConnected, setWsConnected] = useState(false)
   const consoleRef = useRef(null)
   const wsRef = useRef(null)
+  // 사용자가 위로 스크롤해 로그를 읽는 중이면 새 로그가 와도 끌어내리지 않는다.
+  const stickToBottom = useRef(true)
 
   useEffect(() => {
     let reconnectTimer = null
@@ -67,14 +69,22 @@ function ServerConsole() {
 
   useEffect(() => {
     const el = consoleRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight
   }, [consoleLogs])
+
+  const handleScroll = (e) => {
+    const el = e.currentTarget
+    // 1px 반올림 오차 + 마지막 줄 일부만 보이는 경우까지 여유를 둔다.
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+  }
 
   const handleCommandSubmit = (e) => {
     e.preventDefault()
     const trimmed = command.trim()
     if (!trimmed || wsRef.current?.readyState !== WebSocket.OPEN) return
 
+    // 직접 명령을 보냈으면 결과를 보고 싶은 것이므로 맨 아래로 복귀.
+    stickToBottom.current = true
     setConsoleLogs(prev => [...prev, `> ${trimmed}`])
     wsRef.current.send(JSON.stringify({ type: 'command', command: trimmed }))
     setCommand('')
@@ -87,7 +97,7 @@ function ServerConsole() {
         {!wsConnected ? '서버에 연결하는 중...' : agentConnected ? 'MRDash 브리지 연결됨' : 'MRDash 브리지가 연결되어 있지 않습니다'}
       </div>
 
-      <div className="console-output" ref={consoleRef}>
+      <div className="console-output" ref={consoleRef} onScroll={handleScroll}>
         <pre className="console-logs">{consoleLogs.join('\n')}</pre>
       </div>
 
