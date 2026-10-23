@@ -2,6 +2,7 @@ import { Navigate } from "react-router-dom";
 import App from "./App";
 
 import MinecraftServers from "./pages/MinecraftServers";
+import Monitoring from "./pages/Monitoring";
 import Wiki from "./pages/Wiki";
 import Main from "./pages/Main";
 import UserManagement from "./pages/UserManagement";
@@ -18,6 +19,13 @@ export const pages = [
         icon: material("home"),
         path: '/',
         element: <Main />,
+    },
+    {
+        id: 'monitoring',
+        title: '모니터링',
+        icon: material("monitoring"),
+        path: '/monitoring',
+        element: <Monitoring />,
     },
     {
         id: 'minecraft',
