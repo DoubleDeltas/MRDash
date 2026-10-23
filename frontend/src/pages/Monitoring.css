@@ -128,43 +128,44 @@
   gap: 1.25rem;
 }
 
-.toggle-label {
+.live-indicator {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
   color: #B9BBBE;
-  cursor: pointer;
-  user-select: none;
 }
 
-.toggle-label input[type="checkbox"] {
-  accent-color: #7289DA;
-  cursor: pointer;
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1baf7a;
 }
 
-.refresh-btn {
+.live-indicator-off .live-dot {
+  background: #898781;
+}
+
+/* Prometheus 미연결 / 로딩 안내 카드 */
+.monitoring-status-card {
+  background: #2F3136;
+  border: 1px solid #202225;
+  border-radius: 8px;
+  padding: 1.5rem 1.25rem;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  background: #202225;
+  gap: 0.75rem;
+  font-size: 0.95rem;
   color: #DCDDDE;
-  border: 1px solid #40444B;
-  border-radius: 6px;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.refresh-btn:hover {
-  background: #36393F;
-  border-color: #7289DA;
-  color: #FFFFFF;
+.monitoring-status-error {
+  border-color: #e34948;
 }
 
-.refresh-btn .material-icons {
-  font-size: 1.1rem;
+.monitoring-status-error .material-icons {
+  color: #e34948;
 }
 
 /* 컨테이너 범례 */

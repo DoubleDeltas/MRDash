@@ -55,7 +55,7 @@ frontend:
 ### 환경변수 (backend)
 
 서버의 `.env` 파일로 주입 (`env_file: .env`). `.env.example` 참고.  
-주요 항목: `DATABASE_URL`, `SESSION_REDIS_URL`, `DISCORD_CLIENT_ID/SECRET/CALLBACK`, `FRONTEND_URL`, `SESSION_SECRET`
+주요 항목: `DATABASE_URL`, `SESSION_REDIS_URL`, `DISCORD_CLIENT_ID/SECRET/CALLBACK`, `FRONTEND_URL`, `SESSION_SECRET`, `PROMETHEUS_URL`(모니터링 화면용, 미설정·연결 실패 시 화면에 안내 카드 표시)
 
 ### 서버 인프라
 

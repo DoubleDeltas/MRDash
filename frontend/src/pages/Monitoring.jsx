@@ -1,58 +1,22 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { WS_BASE_URL } from '../api/client'
 import './Monitoring.css'
 
-// CLAUDE.md 기반 실제 MRDash 인프라 컨테이너 및 다크 테마 팔레트 (dataviz/palette.md)
-const CONTAINERS = [
-  { id: 'mc-survival', name: 'mc-survival', baseCpu: 26, baseMem: 3.8, color: '#3987e5' },     // Blue
-  { id: 'mc-creative', name: 'mc-creative', baseCpu: 14, baseMem: 2.2, color: '#d95926' },     // Orange
-  { id: 'mrdash-backend', name: 'mrdash-backend', baseCpu: 5, baseMem: 0.8, color: '#199e70' }, // Aqua
-  { id: 'mrdash-frontend', name: 'mrdash-frontend', baseCpu: 2, baseMem: 0.3, color: '#c98500' },// Yellow
-  { id: 'mysql', name: 'mysql', baseCpu: 7, baseMem: 1.4, color: '#d55181' },                  // Magenta
-  { id: 'redis', name: 'redis', baseCpu: 2, baseMem: 0.4, color: '#9085e9' },                  // Violet
-]
+// 다크 테마 categorical 팔레트 (dataviz/palette.md) — 컨테이너 이름순으로 배정
+const CONTAINER_PALETTE = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#1baf7a', '#e34948']
 
-const TOTAL_MEMORY_GB = 16.0
+// 백엔드 /ws/monitoring 스트림의 point에 화면용 시간 라벨과 컨테이너 색을 붙인다.
+function decoratePoints(points) {
+  const names = [...new Set(points.flatMap(p => p.containers.map(c => c.name)))].sort()
+  const colorOf = Object.fromEntries(names.map((name, i) => [name, CONTAINER_PALETTE[i % CONTAINER_PALETTE.length]]))
+  const containers = names.map(name => ({ id: name, name, color: colorOf[name] }))
 
-// 시계열 랜덤 데이터 생성기 (나중에 Prometheus API 연동으로 교체 예정)
-function generateMockTimeSeries(count = 12) {
-  const now = Date.now()
-  const intervalMs = 2 * 60 * 1000 // 2분 간격
-
-  return Array.from({ length: count }, (_, i) => {
-    const time = new Date(now - (count - 1 - i) * intervalMs)
-    const timeLabel = time.toTimeString().slice(0, 5)
-
-    let totalCpu = 0
-    let totalMemory = 0
-
-    const containerValues = CONTAINERS.map(c => {
-      // 현실적인 자연스러운 변동폭 (CPU: ±40%, Memory: ±15%)
-      const cpuJitter = (Math.random() - 0.5) * (c.baseCpu * 0.5)
-      const memJitter = (Math.random() - 0.5) * (c.baseMem * 0.2)
-
-      const cpu = Math.max(0.5, +(c.baseCpu + cpuJitter).toFixed(1))
-      const memory = Math.max(0.1, +(c.baseMem + memJitter).toFixed(2))
-
-      totalCpu += cpu
-      totalMemory += memory
-
-      return {
-        id: c.id,
-        name: c.name,
-        color: c.color,
-        cpu,
-        memory,
-      }
-    })
-
-    return {
-      timestamp: time.getTime(),
-      time: timeLabel,
-      totalCpu: +Math.min(100, totalCpu).toFixed(1),
-      totalMemory: +Math.min(TOTAL_MEMORY_GB, totalMemory).toFixed(2),
-      containers: containerValues,
-    }
-  })
+  const data = points.map(p => ({
+    ...p,
+    time: new Date(p.timestamp).toTimeString().slice(0, 5),
+    containers: p.containers.map(c => ({ ...c, id: c.name, color: colorOf[c.name] })),
+  }))
+  return { data, containers }
 }
 
 // 꺾은선 그래프 (전체 뷰용)
@@ -243,7 +207,7 @@ function StackedBarChart({ data, containers, metric, unit, maxVal, title }) {
   // 막대 너비 및 간격
   const barCount = data.length
   const step = plotW / barCount
-  const barWidth = Math.min(24, Math.max(12, step - 6))
+  const barWidth = Math.min(24, Math.max(4, step - 4))
 
   const yTicks = [0, 0.25, 0.5, 0.75, 1.0].map(ratio => ({
     val: Math.round(maxVal * ratio),
@@ -403,47 +367,78 @@ function StackedBarChart({ data, containers, metric, unit, maxVal, title }) {
 
 function Monitoring() {
   const [viewMode, setViewMode] = useState('total') // 'total' | 'container'
-  const [data, setData] = useState(() => generateMockTimeSeries(12))
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  // 'connecting': 백엔드 ws 연결 중 / 'ok': 데이터 수신 중 / 'unavailable': 백엔드가 Prometheus 조회에 실패
+  const [status, setStatus] = useState('connecting')
+  const [metrics, setMetrics] = useState({ data: [], containers: [], memTotal: 0 })
 
-  // 5초 주기 시계열 업데이트 (시뮬레이션)
+  // 화면을 보고 있는 동안 백엔드가 15초마다 Prometheus 조회 결과(최근 10분치)를 밀어준다.
   useEffect(() => {
-    if (!autoRefresh) return
-    const interval = setInterval(() => {
-      setData(prev => {
-        const last = prev[prev.length - 1]
-        const nextTime = new Date(last.timestamp + 2 * 60 * 1000)
-        const timeLabel = nextTime.toTimeString().slice(0, 5)
+    let reconnectTimer = null
+    let cancelled = false
+    let ws = null
 
-        let totalCpu = 0
-        let totalMemory = 0
+    const connect = () => {
+      ws = new WebSocket(`${WS_BASE_URL}/ws/monitoring`)
 
-        const containerValues = CONTAINERS.map(c => {
-          const cpuJitter = (Math.random() - 0.5) * (c.baseCpu * 0.4)
-          const memJitter = (Math.random() - 0.5) * (c.baseMem * 0.15)
-          const cpu = Math.max(0.5, +(c.baseCpu + cpuJitter).toFixed(1))
-          const memory = Math.max(0.1, +(c.baseMem + memJitter).toFixed(2))
-          totalCpu += cpu
-          totalMemory += memory
-          return { id: c.id, name: c.name, color: c.color, cpu, memory }
-        })
-
-        const nextPoint = {
-          timestamp: nextTime.getTime(),
-          time: timeLabel,
-          totalCpu: +Math.min(100, totalCpu).toFixed(1),
-          totalMemory: +Math.min(TOTAL_MEMORY_GB, totalMemory).toFixed(2),
-          containers: containerValues,
+      ws.onmessage = (event) => {
+        let msg
+        try {
+          msg = JSON.parse(event.data)
+        } catch {
+          return
         }
 
-        return [...prev.slice(1), nextPoint]
-      })
-    }, 5000)
+        if (msg.type === 'metrics') {
+          setMetrics({ ...decoratePoints(msg.points), memTotal: msg.memTotal })
+          setStatus('ok')
+        } else if (msg.type === 'unavailable') {
+          setStatus('unavailable')
+        }
+      }
 
-    return () => clearInterval(interval)
-  }, [autoRefresh])
+      ws.onclose = () => {
+        if (cancelled) return
+        setStatus(prev => (prev === 'unavailable' ? prev : 'connecting'))
+        reconnectTimer = setTimeout(connect, 2000)
+      }
 
+      ws.onerror = () => ws.close()
+    }
+
+    connect()
+
+    return () => {
+      cancelled = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      ws?.close()
+    }
+  }, [])
+
+  const { data, containers, memTotal } = metrics
   const currentPoint = data[data.length - 1] || {}
+  const memRatio = memTotal ? (currentPoint.totalMemory || 0) / memTotal : 0
+
+  if (status === 'unavailable') {
+    return (
+      <div className="monitoring-page">
+        <div className="monitoring-status-card monitoring-status-error">
+          <span className="material-icons">cloud_off</span>
+          Prometheus가 연결되지 않았습니다. 연결 상태와 환경변수를 확인해주세요!
+        </div>
+      </div>
+    )
+  }
+
+  if (data.length < 2) {
+    return (
+      <div className="monitoring-page">
+        <div className="monitoring-status-card">
+          <span className="material-icons">hourglass_empty</span>
+          모니터링 데이터를 불러오는 중입니다...
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="monitoring-page">
@@ -469,20 +464,20 @@ function Monitoring() {
         </div>
 
         <div className="kpi-card">
-          <span className="kpi-label">할당된 메모리</span>
+          <span className="kpi-label">사용 중인 메모리</span>
           <div className="kpi-value-row">
             <span className="kpi-value">
-              {currentPoint.totalMemory ?? 0} <span className="kpi-unit">/ {TOTAL_MEMORY_GB} GB</span>
+              {currentPoint.totalMemory ?? 0} <span className="kpi-unit">/ {memTotal} GB</span>
             </span>
             <span className="kpi-tag" style={{ color: '#1baf7a' }}>
-              {Math.round(((currentPoint.totalMemory || 0) / TOTAL_MEMORY_GB) * 100)}%
+              {Math.round(memRatio * 100)}%
             </span>
           </div>
           <div className="kpi-meter-bg">
             <div
               className="kpi-meter-fill"
               style={{
-                width: `${Math.min(100, ((currentPoint.totalMemory || 0) / TOTAL_MEMORY_GB) * 100)}%`,
+                width: `${Math.min(100, memRatio * 100)}%`,
                 backgroundColor: '#199e70'
               }}
             />
@@ -492,10 +487,9 @@ function Monitoring() {
         <div className="kpi-card">
           <span className="kpi-label">실행 중인 컨테이너</span>
           <div className="kpi-value-row">
-            <span className="kpi-value">{CONTAINERS.length} <span className="kpi-unit">컨테이너</span></span>
-            <span className="kpi-tag" style={{ color: '#1baf7a' }}>정상 작동 중</span>
+            <span className="kpi-value">{currentPoint.containers?.length ?? 0} <span className="kpi-unit">컨테이너</span></span>
           </div>
-          <div className="kpi-subtext">모든 서비스 인프라 활성화됨</div>
+          <div className="kpi-subtext">cAdvisor 기준</div>
         </div>
       </div>
 
@@ -515,27 +509,14 @@ function Monitoring() {
         </div>
 
         <div className="control-actions">
-          <label className="toggle-label">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-            />
-            실시간 갱신 (5초)
-          </label>
-          <button
-            type="button"
-            className="refresh-btn"
-            onClick={() => setData(generateMockTimeSeries(12))}
-            title="새 랜덤 데이터 생성"
-          >
-            <span className="material-icons">refresh</span>
-            새로고침
-          </button>
+          <span className={`live-indicator ${status === 'ok' ? '' : 'live-indicator-off'}`}>
+            <span className="live-dot" />
+            {status === 'ok' ? '실시간 (15초 주기)' : '재연결 중...'}
+          </span>
         </div>
       </div>
 
-      {/* 차트 그리드 (CPU 부하 & 할당된 메모리) */}
+      {/* 차트 그리드 (CPU 부하 & 사용 중인 메모리) */}
       <div className="monitoring-charts-grid">
         {viewMode === 'total' ? (
           <>
@@ -551,8 +532,8 @@ function Monitoring() {
               data={data}
               dataKey="totalMemory"
               unit="GB"
-              maxVal={TOTAL_MEMORY_GB}
-              title="할당된 메모리 (전체 GB)"
+              maxVal={memTotal}
+              title="사용 중인 메모리 (전체 GB)"
               color="#199e70"
             />
           </>
@@ -560,7 +541,7 @@ function Monitoring() {
           <>
             <StackedBarChart
               data={data}
-              containers={CONTAINERS}
+              containers={containers}
               metric="cpu"
               unit="%"
               maxVal={100}
@@ -568,11 +549,11 @@ function Monitoring() {
             />
             <StackedBarChart
               data={data}
-              containers={CONTAINERS}
+              containers={containers}
               metric="memory"
               unit="GB"
-              maxVal={TOTAL_MEMORY_GB}
-              title="할당된 메모리 (컨테이너별 누적 GB)"
+              maxVal={memTotal}
+              title="사용 중인 메모리 (컨테이너별 누적 GB)"
             />
           </>
         )}
@@ -583,7 +564,7 @@ function Monitoring() {
         <div className="container-legend-card">
           <span className="legend-title">컨테이너 범례:</span>
           <div className="legend-items">
-            {CONTAINERS.map(c => (
+            {containers.map(c => (
               <div key={c.id} className="legend-item">
                 <span className="legend-color-box" style={{ backgroundColor: c.color }} />
                 <span className="legend-name">{c.name}</span>

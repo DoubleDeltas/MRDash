@@ -1,6 +1,7 @@
 import { WebSocketServer } from 'ws';
 import { prisma } from '../config/prisma.js';
 import { getSessionUserFromRequest } from './sessionAuth.js';
+import { handleMonitoringConnection } from './monitoringHub.js';
 
 // serverId -> 에이전트 ws 연결 (서버당 하나)
 const agentSockets = new Map();
@@ -108,6 +109,17 @@ export const attachConsoleHub = (httpServer) => {
 
     if (url.pathname === '/ws/agent') {
       wss.handleUpgrade(req, socket, head, (ws) => handleAgentConnection(ws, url));
+      return;
+    }
+
+    if (url.pathname === '/ws/monitoring') {
+      const user = await getSessionUserFromRequest(req);
+      if (!user) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+      wss.handleUpgrade(req, socket, head, (ws) => handleMonitoringConnection(ws));
       return;
     }
 
