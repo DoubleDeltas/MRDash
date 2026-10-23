@@ -23,7 +23,7 @@ export const pages = [
     {
         id: 'monitoring',
         title: '모니터링',
-        icon: material("monitoring"),
+        icon: material("monitor_heart"),
         path: '/monitoring',
         element: <Monitoring />,
     },
