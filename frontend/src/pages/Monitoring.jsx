@@ -509,8 +509,8 @@ function Monitoring() {
             onChange={(e) => setViewMode(e.target.value)}
             className="monitoring-select"
           >
-            <option value="total">전체 (꺾은선 그래프)</option>
-            <option value="container">Docker 컨테이너별 (누적 막대 그래프)</option>
+            <option value="total">전체</option>
+            <option value="container">Docker 컨테이너별</option>
           </select>
         </div>
 
@@ -534,21 +534,6 @@ function Monitoring() {
           </button>
         </div>
       </div>
-
-      {/* 컨테이너별 범례 (Docker 컨테이너별 모드 시 표시) */}
-      {viewMode === 'container' && (
-        <div className="container-legend-card">
-          <span className="legend-title">컨테이너 범례:</span>
-          <div className="legend-items">
-            {CONTAINERS.map(c => (
-              <div key={c.id} className="legend-item">
-                <span className="legend-color-box" style={{ backgroundColor: c.color }} />
-                <span className="legend-name">{c.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* 차트 그리드 (CPU 부하 & 할당된 메모리) */}
       <div className="monitoring-charts-grid">
@@ -592,6 +577,21 @@ function Monitoring() {
           </>
         )}
       </div>
+
+      {/* 컨테이너별 범례 (Docker 컨테이너별 모드 시 표시) */}
+      {viewMode === 'container' && (
+        <div className="container-legend-card">
+          <span className="legend-title">컨테이너 범례:</span>
+          <div className="legend-items">
+            {CONTAINERS.map(c => (
+              <div key={c.id} className="legend-item">
+                <span className="legend-color-box" style={{ backgroundColor: c.color }} />
+                <span className="legend-name">{c.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
