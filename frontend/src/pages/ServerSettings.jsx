@@ -214,8 +214,10 @@ function ServerSettings() {
 
         <div className="server-form-row">
           <label>모니터링 데이터 소스 연결</label>
+          {/* 상태별로 key를 달리해 버튼을 새로 만든다 — 같은 <button>을 재사용하면 클래스만 바뀌면서
+              transition: all 때문에 한 버튼이 다른 버튼 모양으로 변하는 애니메이션이 생긴다 */}
           {server.monitoringDataSource ? (
-            <div className="monitoring-source-row">
+            <div key="connected" className="monitoring-source-row">
               <span className="monitoring-source-label">
                 {DATA_SOURCE_LABELS[server.monitoringDataSource] || server.monitoringDataSource} 데이터 소스가 연결되어 있습니다.
                 <Link
@@ -236,7 +238,7 @@ function ServerSettings() {
               </button>
             </div>
           ) : (
-            <div className="monitoring-source-row">
+            <div key="disconnected" className="monitoring-source-row">
               <span className="monitoring-source-label">모니터링 데이터 소스가 연결되지 않았습니다.</span>
               <button
                 type="button"
