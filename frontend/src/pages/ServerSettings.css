@@ -7,11 +7,16 @@
 }
 
 /* 모니터링 데이터 소스 연결 */
+/* 문구 아래 줄에 버튼을 입력칸처럼 가로 전체로 */
 .monitoring-source-row {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.75rem;
-  flex-wrap: wrap;
+}
+
+.monitoring-source-row > button {
+  align-self: stretch;
 }
 
 .monitoring-source-label {
@@ -38,8 +43,9 @@
 }
 
 .monitoring-source-connect {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.35rem 1rem 0.35rem 0.5rem;
 }
