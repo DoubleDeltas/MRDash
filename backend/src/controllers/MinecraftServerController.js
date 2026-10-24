@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { MinecraftPlatform, MonitoringDataSource } from '@prisma/client';
+import { MinecraftPlatform, MonitoringDataSource, PrometheusExporter } from '@prisma/client';
 import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
 import { isAgentConnected } from '../ws/consoleHub.js';
@@ -140,15 +140,32 @@ export const issueConsoleToken = async (req, res) => {
 export const connectMonitoringDataSource = async (req, res) => {
   try {
     const { id } = req.params;
-    const { dataSource } = req.body;
+    const { dataSource, host, port, exporter } = req.body;
 
     if (!Object.values(MonitoringDataSource).includes(dataSource)) {
       return res.status(400).json({ success: false, error: `dataSource must be one of: ${Object.values(MonitoringDataSource).join(', ')}` });
     }
 
+    // 지금은 Prometheus뿐이라 연결 정보도 Prometheus용 필드만 받는다
+    const trimmedHost = typeof host === 'string' ? host.trim() : '';
+    if (!trimmedHost) {
+      return res.status(400).json({ success: false, error: 'host is required' });
+    }
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      return res.status(400).json({ success: false, error: 'port must be an integer between 0 and 65535' });
+    }
+    if (!Object.values(PrometheusExporter).includes(exporter)) {
+      return res.status(400).json({ success: false, error: `exporter must be one of: ${Object.values(PrometheusExporter).join(', ')}` });
+    }
+
     const server = await prisma.minecraftServer.update({
       where: { id: parseInt(id) },
-      data: { monitoringDataSource: dataSource },
+      data: {
+        monitoringDataSource: dataSource,
+        prometheusHost: trimmedHost,
+        prometheusPort: port,
+        prometheusExporter: exporter,
+      },
       include: MANAGERS_INCLUDE,
     });
 
@@ -168,7 +185,12 @@ export const disconnectMonitoringDataSource = async (req, res) => {
 
     const server = await prisma.minecraftServer.update({
       where: { id: parseInt(id) },
-      data: { monitoringDataSource: null },
+      data: {
+        monitoringDataSource: null,
+        prometheusHost: null,
+        prometheusPort: null,
+        prometheusExporter: null,
+      },
       include: MANAGERS_INCLUDE,
     });
 

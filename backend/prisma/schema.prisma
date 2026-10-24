@@ -48,6 +48,10 @@ enum MonitoringDataSource {
   PROMETHEUS
 }
 
+enum PrometheusExporter {
+  MINECRAFT_PROMETHEUS_EXPORTER
+}
+
 model MinecraftServer {
   id                   Int                   @id @default(autoincrement())
   name                 String
@@ -57,6 +61,9 @@ model MinecraftServer {
   color                String?
   consoleToken         String?
   monitoringDataSource MonitoringDataSource?
+  prometheusHost       String?
+  prometheusPort       Int?
+  prometheusExporter   PrometheusExporter?
   mcVersion            String
   mcPlatform           MinecraftPlatform
   ownerId              String?
