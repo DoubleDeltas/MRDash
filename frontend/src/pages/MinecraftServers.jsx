@@ -2,24 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient, API_BASE_URL } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
-import ImageCropper from '../components/ImageCropper'
+import { ServerFormFields, PLATFORM_LABELS, EMPTY_FORM, serverImageUrl } from '../components/ServerFormFields'
 import './MinecraftServers.css'
-
-const PLATFORM_LABELS = {
-  VANILLA: '바닐라',
-  FORGE: 'Forge',
-  NEOFORGE: 'NeoForge',
-  FABRIC: 'Fabric',
-  QUILT: 'Quilt',
-}
-
-const EMPTY_FORM = { name: '', description: '', address: '', mcVersion: '', mcPlatform: 'VANILLA', color: null, imageBase64: null, ownerId: null, managerIds: [] }
-const DEFAULT_COLOR = '#7289DA'
-
-const serverImageUrl = (server) =>
-  server.hasImage
-    ? `${API_BASE_URL}/servers/${server.id}/image`
-    : `https://api.dicebear.com/7.x/identicon/svg?seed=minecraft${server.id}`
 
 const playerHeadUrl = (uuid) => `${API_BASE_URL}/players/${uuid}/head`
 
@@ -56,85 +40,6 @@ const getServerTextColors = (backgroundColor) => {
   }
 }
 
-function ServerFormFields({ form, onChange, onColorReset, imagePreviewUrl, onImageConfirm, ownerPicker, managerPicker }) {
-  const [pendingFile, setPendingFile] = useState(null)
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0]
-    if (file) setPendingFile(file)
-    e.target.value = ''
-  }
-
-  return (
-    <>
-      <div className="server-form-row">
-        <label>이미지</label>
-        <div className="server-form-image-picker">
-          <div className="server-form-image-preview">
-            {imagePreviewUrl
-              ? <img src={imagePreviewUrl} alt="미리보기" />
-              : <span className="material-icons">image</span>}
-          </div>
-          <label className="server-form-image-upload">
-            이미지 선택
-            <input type="file" accept="image/*" onChange={handleFileSelect} hidden />
-          </label>
-        </div>
-      </div>
-      <div className="server-form-row">
-        <label>서버 이름</label>
-        <input name="name" value={form.name} onChange={onChange} required />
-      </div>
-      <div className="server-form-row">
-        <label>서버 설명</label>
-        <input name="description" value={form.description} onChange={onChange} />
-      </div>
-      <div className="server-form-row">
-        <label>연결 주소</label>
-        <input name="address" value={form.address} onChange={onChange} placeholder="example.marendi.kr" required />
-      </div>
-      <div className="server-form-row">
-        <label>Version</label>
-        <input name="mcVersion" value={form.mcVersion} onChange={onChange} placeholder="1.21.1" required />
-      </div>
-      <div className="server-form-row">
-        <label>Platform</label>
-        <select name="mcPlatform" value={form.mcPlatform} onChange={onChange}>
-          {Object.entries(PLATFORM_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="server-form-row">
-        <label>색상 (온라인일 때 카드 배경)</label>
-        <div className="server-form-color-row">
-          <input
-            type="color"
-            name="color"
-            value={form.color || DEFAULT_COLOR}
-            onChange={onChange}
-          />
-          <button type="button" className="server-form-color-reset" onClick={onColorReset}>
-            리셋
-          </button>
-          {form.color === null && <span className="server-form-color-empty">색상 없음</span>}
-        </div>
-      </div>
-
-      {ownerPicker}
-      {managerPicker}
-
-      {pendingFile && (
-        <ImageCropper
-          file={pendingFile}
-          onConfirm={(dataUrl) => { onImageConfirm(dataUrl); setPendingFile(null) }}
-          onCancel={() => setPendingFile(null)}
-        />
-      )}
-    </>
-  )
-}
-
 function MinecraftServers() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -143,7 +48,6 @@ function MinecraftServers() {
   const isManager = (server) => !!user && server.managerIds?.includes(user.id)
 
   const [servers, setServers] = useState([])
-  const [allUsers, setAllUsers] = useState(null)
   const [loading, setLoading] = useState(true)
   const [statusesLoading, setStatusesLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -158,17 +62,6 @@ function MinecraftServers() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState(null)
-
-  const [editingId, setEditingId] = useState(null)
-  const [editingHasImage, setEditingHasImage] = useState(false)
-  const [editForm, setEditForm] = useState(EMPTY_FORM)
-  const [editSubmitting, setEditSubmitting] = useState(false)
-  const [editError, setEditError] = useState(null)
-  const [issuedToken, setIssuedToken] = useState(null)
-  const [issuingToken, setIssuingToken] = useState(false)
-  const [tokenCopied, setTokenCopied] = useState(false)
-  const [deleteConfirmServer, setDeleteConfirmServer] = useState(null)
-  const [deleting, setDeleting] = useState(false)
 
   const loadServers = async () => {
     const res = await apiClient.get('/servers')
@@ -238,85 +131,8 @@ function MinecraftServers() {
     }
   }
 
-  const handleIssueToken = async (serverId) => {
-    setIssuingToken(true)
-    try {
-      const res = await apiClient.post(`/servers/${serverId}/console-token`)
-      setIssuedToken(res.data.data.consoleToken)
-      setTokenCopied(false)
-      setServers(prev => prev.map(s => (s.id === serverId ? { ...s, hasConsoleToken: true } : s)))
-    } catch {
-      setEditError('콘솔 토큰 발급에 실패했습니다.')
-    } finally {
-      setIssuingToken(false)
-    }
-  }
-
-  const handleCopyToken = async () => {
-    if (!issuedToken) return
-    await navigator.clipboard.writeText(issuedToken)
-    setTokenCopied(true)
-    setTimeout(() => setTokenCopied(false), 1500)
-  }
-
-  const handleEditClick = (server) => {
-    setEditingId(server.id)
-    setEditingHasImage(server.hasImage)
-    setEditError(null)
-    setIssuedToken(null)
-    setEditForm({
-      name: server.name,
-      description: server.description || '',
-      address: server.address,
-      mcVersion: server.mcVersion,
-      mcPlatform: server.mcPlatform,
-      color: server.color,
-      imageBase64: null,
-      ownerId: server.ownerId,
-      managerIds: server.managerIds || [],
-    })
-
-    if (isAdmin && allUsers === null) {
-      apiClient.get('/users')
-        .then(res => setAllUsers(res.data.data))
-        .catch(() => setAllUsers([]))
-    }
-  }
-
-  const handleEditFormChange = (e) => {
-    setEditForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteConfirmServer) return
-    setDeleting(true)
-    try {
-      await apiClient.delete(`/servers/${deleteConfirmServer.id}`)
-      setServers(prev => prev.filter(s => s.id !== deleteConfirmServer.id))
-      setEditingId(null)
-      setIssuedToken(null)
-      setDeleteConfirmServer(null)
-    } catch (err) {
-      setEditError(err.response?.data?.error || '서버 삭제에 실패했습니다.')
-      setDeleteConfirmServer(null)
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  const handleEditSubmit = async (e, serverId) => {
-    e.preventDefault()
-    setEditSubmitting(true)
-    setEditError(null)
-    try {
-      const res = await apiClient.put(`/servers/${serverId}`, editForm)
-      setServers(prev => prev.map(s => (s.id === serverId ? res.data.data : s)))
-      setEditingId(null)
-    } catch (err) {
-      setEditError(err.response?.data?.error || '서버 수정에 실패했습니다.')
-    } finally {
-      setEditSubmitting(false)
-    }
+  const handleSettingsClick = (serverId) => {
+    navigate(`/settings/${serverId}`)
   }
 
   if (loading) {
@@ -398,14 +214,11 @@ function MinecraftServers() {
           <p className="servers-message">등록된 서버가 없습니다.</p>
         )}
         {sortedServers.map(server => {
-          // 수정 중인 카드는 저장 전이라도 color picker 값을 실시간으로 미리보기하고,
-          // 취소하면 editForm이 버려지므로 자연히 원래 색(server.color)으로 돌아간다.
-          const previewColor = editingId === server.id ? editForm.color : server.color
-          const isOnlineWithColor = statuses[server.id]?.online && previewColor
-          const textColors = isOnlineWithColor ? getServerTextColors(previewColor) : null
+          const isOnlineWithColor = statuses[server.id]?.online && server.color
+          const textColors = isOnlineWithColor ? getServerTextColors(server.color) : null
           const cardStyle = isOnlineWithColor
             ? {
-                backgroundColor: previewColor,
+                backgroundColor: server.color,
                 '--server-text-primary': textColors.primary,
                 '--server-text-secondary': textColors.secondary,
                 '--server-text-tertiary': textColors.tertiary,
@@ -477,6 +290,19 @@ function MinecraftServers() {
               </div>
 
               <div className="server-actions">
+                {(isAdmin || isOwner(server) || isManager(server)) && (
+                  <button
+                    className="action-button"
+                    onMouseEnter={() => setHoveredButtonId(`monitoring-${server.id}`)}
+                    onMouseLeave={() => setHoveredButtonId(null)}
+                  >
+                    <span className="material-icons">monitor_heart</span>
+                    {hoveredButtonId === `monitoring-${server.id}` && (
+                      <div className="action-tooltip">모니터링</div>
+                    )}
+                  </button>
+                )}
+
                 {(isAdmin || isOwner(server) || isManager(server)) && (() => {
                   const agentConnected = agentStatuses[server.id] === true
                   return (
@@ -508,7 +334,7 @@ function MinecraftServers() {
                     className="action-button"
                     onMouseEnter={() => setHoveredButtonId(`edit-${server.id}`)}
                     onMouseLeave={() => setHoveredButtonId(null)}
-                    onClick={() => handleEditClick(server)}
+                    onClick={() => handleSettingsClick(server.id)}
                     title="서버 수정"
                   >
                     <span className="material-icons">settings</span>
@@ -519,131 +345,10 @@ function MinecraftServers() {
                 )}
               </div>
             </div>
-
-            {editingId === server.id && (
-              <form className="server-form" onSubmit={(e) => handleEditSubmit(e, server.id)}>
-                <ServerFormFields
-                  form={editForm}
-                  onChange={handleEditFormChange}
-                  onColorReset={() => setEditForm(prev => ({ ...prev, color: null }))}
-                  imagePreviewUrl={editForm.imageBase64 || (editingHasImage ? serverImageUrl(server) : null)}
-                  onImageConfirm={(dataUrl) => setEditForm(prev => ({ ...prev, imageBase64: dataUrl }))}
-                  ownerPicker={isAdmin && (
-                    <div className="server-form-row">
-                      <label>소유자</label>
-                      <select
-                        value={editForm.ownerId || ''}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, ownerId: e.target.value || null }))}
-                      >
-                        <option value="">없음</option>
-                        {(allUsers || []).map(u => (
-                          <option key={u.id} value={u.id}>
-                            {u.nickname || u.handle || u.providerId}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  managerPicker={isAdmin && (
-                    <div className="server-form-row">
-                      <label>관리자 (콘솔 접속만 가능)</label>
-                      <div className="server-form-manager-list">
-                        {(allUsers || []).length === 0 && (
-                          <span className="server-form-color-empty">유저가 없습니다</span>
-                        )}
-                        {(allUsers || []).map(u => (
-                          <label key={u.id} className="server-form-manager-item">
-                            <input
-                              type="checkbox"
-                              checked={editForm.managerIds.includes(u.id)}
-                              onChange={(e) => {
-                                setEditForm(prev => ({
-                                  ...prev,
-                                  managerIds: e.target.checked
-                                    ? [...prev.managerIds, u.id]
-                                    : prev.managerIds.filter(id => id !== u.id),
-                                }))
-                              }}
-                            />
-                            {u.nickname || u.handle || u.providerId}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                />
-
-                <div className="server-form-row">
-                  <label>콘솔 연동</label>
-                  <div className="console-token-row">
-                    <button
-                      type="button"
-                      className="console-token-button"
-                      onClick={() => handleIssueToken(server.id)}
-                      disabled={issuingToken}
-                    >
-                      {server.hasConsoleToken ? '콘솔 토큰 재발급' : '콘솔 토큰 발급'}
-                    </button>
-                    {issuedToken && <code className="console-token-value">{issuedToken}</code>}
-                    {issuedToken && (
-                      <button
-                        type="button"
-                        className="console-token-copy"
-                        onClick={handleCopyToken}
-                      >
-                        <span className="material-icons">{tokenCopied ? 'check' : 'content_copy'}</span>
-                        {tokenCopied ? '복사됨' : '복사하기'}
-                      </button>
-                    )}
-                  </div>
-                  {issuedToken && (
-                    <p className="console-token-hint">
-                      이 토큰은 다시 보여주지 않습니다. MRD bridge의 API Key 칸에 지금 복사해두세요.
-                    </p>
-                  )}
-                </div>
-
-                {editError && <p className="server-form-error">{editError}</p>}
-
-                <div className="server-form-actions">
-                  <button type="submit" className="server-form-submit" disabled={editSubmitting}>
-                    {editSubmitting ? '저장하는 중...' : '저장'}
-                  </button>
-                  <button
-                    type="button"
-                    className="server-form-delete"
-                    disabled={!isAdmin && !isOwner(server)}
-                    onClick={() => setDeleteConfirmServer(server)}
-                  >
-                    삭제
-                  </button>
-                  <button type="button" className="server-form-cancel" onClick={() => { setEditingId(null); setIssuedToken(null) }}>
-                    취소
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
           )
         })}
       </div>
-      {deleteConfirmServer && (
-        <div className="delete-confirm-overlay" onClick={() => setDeleteConfirmServer(null)}>
-          <div className="delete-confirm-modal" onClick={e => e.stopPropagation()}>
-            <p className="delete-confirm-message">
-              정말로 <strong>{deleteConfirmServer.name}</strong> 서버를 삭제할까요?
-            </p>
-            <div className="delete-confirm-actions">
-              <button className="delete-confirm-ok" onClick={handleDeleteConfirm} disabled={deleting}>
-                {deleting ? '삭제 중...' : '삭제'}
-              </button>
-              <button className="delete-confirm-cancel" onClick={() => setDeleteConfirmServer(null)} disabled={deleting}>
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

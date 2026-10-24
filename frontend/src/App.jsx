@@ -6,10 +6,15 @@ import './App.css'
 import { pagesByPath } from './pageConstants'
 import { apiClient } from './api/client'
 
+const SERVER_SUB_PAGES = [
+  { prefix: '/console/', title: '콘솔', icon: 'terminal' },
+  { prefix: '/settings/', title: '서버 설정', icon: 'settings' },
+]
+
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
-  const [consoleServerName, setConsoleServerName] = useState(null)
+  const [serverPageName, setServerPageName] = useState(null)
   const location = useLocation()
 
   useEffect(() => {
@@ -21,25 +26,28 @@ function App() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // 서버 하위 페이지(/console/:id, /settings/:id)는 breadcrumb에 서버 이름을 보여준다
+  const serverSubPage = SERVER_SUB_PAGES.find(p => location.pathname.startsWith(p.prefix))
+
   useEffect(() => {
-    if (!location.pathname.startsWith('/console/')) {
-      setConsoleServerName(null)
+    if (!serverSubPage) {
+      setServerPageName(null)
       return
     }
     const serverId = location.pathname.split('/').pop()
     apiClient.get(`/servers/${serverId}`)
-      .then(res => setConsoleServerName(res.data.data.name))
-      .catch(() => setConsoleServerName(null))
+      .then(res => setServerPageName(res.data.data.name))
+      .catch(() => setServerPageName(null))
   }, [location.pathname])
 
   const getPageInfo = () => {
     const page = pagesByPath[location.pathname]
 
-    if (location.pathname.startsWith('/console/')) {
+    if (serverSubPage) {
       return {
         breadcrumbs: [
           { title: '마인크래프트 서버', path: '/minecraft' },
-          { title: consoleServerName || '콘솔', path: null, icon: <span className="material-icons">terminal</span> }
+          { title: serverPageName || serverSubPage.title, path: null, icon: <span className="material-icons">{serverSubPage.icon}</span> }
         ]
       }
     }
