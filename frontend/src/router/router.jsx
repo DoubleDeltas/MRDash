@@ -3,6 +3,7 @@ import App from '../App'
 import Main from '../pages/Main'
 import MinecraftServers from '../pages/MinecraftServers'
 import ServerConsole from '../pages/ServerConsole'
+import ServerSettings from '../pages/ServerSettings'
 import Login from '../pages/Login'
 import { pages } from '../pageConstants'
 
@@ -21,6 +22,10 @@ export const router = createBrowserRouter([
       {
         path: '/console/:serverId',
         element: <ServerConsole />
+      },
+      {
+        path: '/settings/:serverId',
+        element: <ServerSettings />
       }
     ]
   }
