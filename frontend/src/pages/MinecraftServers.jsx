@@ -291,16 +291,18 @@ function MinecraftServers() {
 
               <div className="server-actions">
                 {(isAdmin || isOwner(server) || isManager(server)) && (
-                  <button
-                    className="action-button"
+                  <div
+                    className="action-button-wrapper"
                     onMouseEnter={() => setHoveredButtonId(`monitoring-${server.id}`)}
                     onMouseLeave={() => setHoveredButtonId(null)}
                   >
-                    <span className="material-icons">monitor_heart</span>
+                    <button className="action-button">
+                      <span className="material-icons">monitor_heart</span>
+                    </button>
                     {hoveredButtonId === `monitoring-${server.id}` && (
                       <div className="action-tooltip">모니터링</div>
                     )}
-                  </button>
+                  </div>
                 )}
 
                 {(isAdmin || isOwner(server) || isManager(server)) && (() => {
@@ -330,18 +332,18 @@ function MinecraftServers() {
                 })()}
 
                 {(isAdmin || isOwner(server)) && (
-                  <button
-                    className="action-button"
-                    onMouseEnter={() => setHoveredButtonId(`edit-${server.id}`)}
+                  <div
+                    className="action-button-wrapper"
+                    onMouseEnter={() => setHoveredButtonId(`settings-${server.id}`)}
                     onMouseLeave={() => setHoveredButtonId(null)}
-                    onClick={() => handleSettingsClick(server.id)}
-                    title="서버 수정"
                   >
-                    <span className="material-icons">settings</span>
-                    {hoveredButtonId === `edit-${server.id}` && (
-                      <div className="action-tooltip">서버 수정</div>
+                    <button className="action-button" onClick={() => handleSettingsClick(server.id)}>
+                      <span className="material-icons">settings</span>
+                    </button>
+                    {hoveredButtonId === `settings-${server.id}` && (
+                      <div className="action-tooltip">서버 설정</div>
                     )}
-                  </button>
+                  </div>
                 )}
               </div>
             </div>

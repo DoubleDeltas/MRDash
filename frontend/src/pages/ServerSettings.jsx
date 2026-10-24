@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { ServerFormFields, EMPTY_FORM, serverImageUrl } from '../components/ServerFormFields'
+import PrometheusIcon from '../components/PrometheusIcon'
 import './MinecraftServers.css'
 import './ServerSettings.css'
+
+const DATA_SOURCE_LABELS = {
+  PROMETHEUS: 'Prometheus',
+}
 
 function ServerSettings() {
   const { serverId } = useParams()
@@ -23,6 +28,7 @@ function ServerSettings() {
   const [issuedToken, setIssuedToken] = useState(null)
   const [issuingToken, setIssuingToken] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
+  const [dataSourceUpdating, setDataSourceUpdating] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -73,6 +79,31 @@ function ServerSettings() {
     }
   }
 
+  // 데이터 소스 연결/해제는 [저장]과 별개로 즉시 반영한다 (콘솔 토큰 발급과 같은 방식)
+  const handleConnectDataSource = async (dataSource) => {
+    setDataSourceUpdating(true)
+    try {
+      const res = await apiClient.put(`/servers/${server.id}/monitoring-data-source`, { dataSource })
+      setServer(prev => ({ ...prev, monitoringDataSource: res.data.data.monitoringDataSource }))
+    } catch {
+      setEditError('모니터링 데이터 소스 연결에 실패했습니다.')
+    } finally {
+      setDataSourceUpdating(false)
+    }
+  }
+
+  const handleDisconnectDataSource = async () => {
+    setDataSourceUpdating(true)
+    try {
+      await apiClient.delete(`/servers/${server.id}/monitoring-data-source`)
+      setServer(prev => ({ ...prev, monitoringDataSource: null }))
+    } catch {
+      setEditError('모니터링 데이터 소스 연결 해제에 실패했습니다.')
+    } finally {
+      setDataSourceUpdating(false)
+    }
+  }
+
   const handleCopyToken = async () => {
     if (!issuedToken) return
     await navigator.clipboard.writeText(issuedToken)
@@ -101,7 +132,7 @@ function ServerSettings() {
       await apiClient.put(`/servers/${server.id}`, editForm)
       navigate('/minecraft')
     } catch (err) {
-      setEditError(err.response?.data?.error || '서버 수정에 실패했습니다.')
+      setEditError(err.response?.data?.error || '서버 설정 저장에 실패했습니다.')
     } finally {
       setEditSubmitting(false)
     }
@@ -180,6 +211,45 @@ function ServerSettings() {
             </div>
           )}
         />
+
+        <div className="server-form-row">
+          <label>모니터링 데이터 소스 연결</label>
+          {server.monitoringDataSource ? (
+            <div className="monitoring-source-row">
+              <span className="monitoring-source-label">
+                {DATA_SOURCE_LABELS[server.monitoringDataSource] || server.monitoringDataSource} 데이터 소스가 연결되어 있습니다.
+                <Link
+                  to={`/settings/prometheus/${server.id}`}
+                  className="monitoring-source-link"
+                  title="데이터 소스 설정"
+                >
+                  <span className="material-icons">north_east</span>
+                </Link>
+              </span>
+              <button
+                type="button"
+                className="server-form-delete"
+                onClick={handleDisconnectDataSource}
+                disabled={dataSourceUpdating}
+              >
+                연결 해제
+              </button>
+            </div>
+          ) : (
+            <div className="monitoring-source-row">
+              <span className="monitoring-source-label">모니터링 데이터 소스가 연결되지 않았습니다.</span>
+              <button
+                type="button"
+                className="console-token-button monitoring-source-connect"
+                onClick={() => handleConnectDataSource('PROMETHEUS')}
+                disabled={dataSourceUpdating}
+              >
+                <PrometheusIcon size={32} />
+                Prometheus 연결
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="server-form-row">
           <label>콘솔 연동</label>

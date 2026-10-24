@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAll, getById, getImage, getStatus, getAgentStatus, create, update, deleteServer, issueConsoleToken } from '../controllers/MinecraftServerController.js';
+import { getAll, getById, getImage, getStatus, getAgentStatus, create, update, deleteServer, issueConsoleToken, connectMonitoringDataSource, disconnectMonitoringDataSource } from '../controllers/MinecraftServerController.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
 import { requireAdminOrOwner } from '../middleware/requireAdminOrOwner.js';
 
@@ -15,5 +15,7 @@ router.post('/', requireAdmin, create);
 router.put('/:id', requireAdminOrOwner, update);
 router.delete('/:id', requireAdminOrOwner, deleteServer);
 router.post('/:id/console-token', requireAdminOrOwner, issueConsoleToken);
+router.put('/:id/monitoring-data-source', requireAdminOrOwner, connectMonitoringDataSource);
+router.delete('/:id/monitoring-data-source', requireAdminOrOwner, disconnectMonitoringDataSource);
 
 export default router;
