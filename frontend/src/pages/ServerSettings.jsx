@@ -79,19 +79,8 @@ function ServerSettings() {
     }
   }
 
-  // 데이터 소스 연결/해제는 [저장]과 별개로 즉시 반영한다 (콘솔 토큰 발급과 같은 방식)
-  const handleConnectDataSource = async (dataSource) => {
-    setDataSourceUpdating(true)
-    try {
-      const res = await apiClient.put(`/servers/${server.id}/monitoring-data-source`, { dataSource })
-      setServer(prev => ({ ...prev, monitoringDataSource: res.data.data.monitoringDataSource }))
-    } catch {
-      setEditError('모니터링 데이터 소스 연결에 실패했습니다.')
-    } finally {
-      setDataSourceUpdating(false)
-    }
-  }
-
+  // 연결 해제는 [저장]과 별개로 즉시 반영한다 (콘솔 토큰 발급과 같은 방식).
+  // 연결은 Host/Port 등을 받아야 해서 /settings/prometheus/:serverId 페이지에서 한다.
   const handleDisconnectDataSource = async () => {
     setDataSourceUpdating(true)
     try {
@@ -243,8 +232,7 @@ function ServerSettings() {
               <button
                 type="button"
                 className="console-token-button monitoring-source-connect"
-                onClick={() => handleConnectDataSource('PROMETHEUS')}
-                disabled={dataSourceUpdating}
+                onClick={() => navigate(`/settings/prometheus/${server.id}`)}
               >
                 <PrometheusIcon size={32} />
                 Prometheus 연결

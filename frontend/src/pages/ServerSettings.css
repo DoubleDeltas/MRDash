@@ -49,3 +49,62 @@
   gap: 0.5rem;
   padding: 0.35rem 1rem 0.35rem 0.5rem;
 }
+
+/* Prometheus 설정: Host / Port 한 줄 */
+.prometheus-address-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.prometheus-host {
+  flex: 1;
+  min-width: 0;
+}
+
+.prometheus-port {
+  width: 9rem;
+}
+
+/* Exporter 선택지 — 라디오는 숨기고 카드 전체를 선택 영역으로 */
+.exporter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.server-form-row .exporter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+  background: #202225;
+  border: 1px solid #36393F;
+  border-radius: 6px;
+  color: #DCDDDE;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.server-form-row .exporter-option:hover {
+  border-color: #72767d;
+}
+
+.server-form-row .exporter-option.selected {
+  border-color: #7289DA;
+  background: rgba(114, 137, 218, 0.15);
+  color: #FFFFFF;
+}
+
+.exporter-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.server-form-row .exporter-option:has(input:focus-visible) {
+  outline: 2px solid #7289DA;
+  outline-offset: 2px;
+}
