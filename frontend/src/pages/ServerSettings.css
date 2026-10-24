@@ -5,3 +5,41 @@
   gap: 2rem;
   max-width: 720px;
 }
+
+/* 모니터링 데이터 소스 연결 */
+.monitoring-source-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.monitoring-source-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: #DCDDDE;
+}
+
+.monitoring-source-link {
+  display: inline-flex;
+  color: #B9BBBE;
+  border-radius: 4px;
+}
+
+.monitoring-source-link:hover {
+  background: #36393F;
+  color: #FFFFFF;
+}
+
+.monitoring-source-link .material-icons {
+  font-size: 1.1rem;
+}
+
+.monitoring-source-connect {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem 0.35rem 0.5rem;
+}

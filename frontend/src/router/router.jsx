@@ -4,6 +4,7 @@ import Main from '../pages/Main'
 import MinecraftServers from '../pages/MinecraftServers'
 import ServerConsole from '../pages/ServerConsole'
 import ServerSettings from '../pages/ServerSettings'
+import PrometheusSettings from '../pages/PrometheusSettings'
 import Login from '../pages/Login'
 import { pages } from '../pageConstants'
 
@@ -26,6 +27,10 @@ export const router = createBrowserRouter([
       {
         path: '/settings/:serverId',
         element: <ServerSettings />
+      },
+      {
+        path: '/settings/prometheus/:serverId',
+        element: <PrometheusSettings />
       }
     ]
   }

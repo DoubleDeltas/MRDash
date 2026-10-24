@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { MinecraftPlatform } from '@prisma/client';
+import { MinecraftPlatform, MonitoringDataSource } from '@prisma/client';
 import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
 import { isAgentConnected } from '../ws/consoleHub.js';
@@ -132,6 +132,51 @@ export const issueConsoleToken = async (req, res) => {
 
     res.json({ success: true, data: { consoleToken } });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// 모니터링 데이터 소스 연결
+export const connectMonitoringDataSource = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dataSource } = req.body;
+
+    if (!Object.values(MonitoringDataSource).includes(dataSource)) {
+      return res.status(400).json({ success: false, error: `dataSource must be one of: ${Object.values(MonitoringDataSource).join(', ')}` });
+    }
+
+    const server = await prisma.minecraftServer.update({
+      where: { id: parseInt(id) },
+      data: { monitoringDataSource: dataSource },
+      include: MANAGERS_INCLUDE,
+    });
+
+    res.json({ success: true, data: toPublicServer(server) });
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Server not found' });
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// 모니터링 데이터 소스 연결 해제
+export const disconnectMonitoringDataSource = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const server = await prisma.minecraftServer.update({
+      where: { id: parseInt(id) },
+      data: { monitoringDataSource: null },
+      include: MANAGERS_INCLUDE,
+    });
+
+    res.json({ success: true, data: toPublicServer(server) });
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Server not found' });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 };
