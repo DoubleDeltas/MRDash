@@ -140,37 +140,37 @@ function PrometheusSettings() {
                 {option.label}
               </label>
             ))}
+            {/* 외부 Prometheus가 목록의 마지막 항목이라 그 바로 아래, 같은 상자 안에 둔다 */}
+            {target === 'EXTERNAL' && (
+              <div className="prometheus-address-row">
+                <div className="server-form-row prometheus-host">
+                  <label htmlFor="prometheus-host">Host</label>
+                  <input
+                    id="prometheus-host"
+                    value={host}
+                    onChange={(e) => setHost(e.target.value)}
+                    placeholder="example.marendi.kr"
+                    required
+                  />
+                </div>
+                <div className="server-form-row prometheus-port">
+                  <label htmlFor="prometheus-port">Port</label>
+                  <input
+                    id="prometheus-port"
+                    type="number"
+                    min={MIN_PORT}
+                    max={MAX_PORT}
+                    step={1}
+                    value={port}
+                    onChange={(e) => setPort(e.target.value)}
+                    onBlur={handlePortBlur}
+                    required
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {target === 'EXTERNAL' && (
-          <div className="prometheus-address-row">
-            <div className="server-form-row prometheus-host">
-              <label htmlFor="prometheus-host">Host</label>
-              <input
-                id="prometheus-host"
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                placeholder="example.marendi.kr"
-                required
-              />
-            </div>
-            <div className="server-form-row prometheus-port">
-              <label htmlFor="prometheus-port">Port</label>
-              <input
-                id="prometheus-port"
-                type="number"
-                min={MIN_PORT}
-                max={MAX_PORT}
-                step={1}
-                value={port}
-                onChange={(e) => setPort(e.target.value)}
-                onBlur={handlePortBlur}
-                required
-              />
-            </div>
-          </div>
-        )}
 
         <div className="server-form-row">
           <label>Exporter 선택</label>
