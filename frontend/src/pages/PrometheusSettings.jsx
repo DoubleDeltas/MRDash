@@ -67,11 +67,17 @@ function PrometheusSettings() {
   useEffect(() => {
     setTestState('idle')
     setTestReason(null)
-  }, [target, url, token, clearToken, job, instance])
+  }, [target, url, token, clearToken, job, instance, exporter])
 
   // 저장 전 폼 값 그대로 테스트한다 (토큰 칸이 비어 있으면 저장된 토큰 사용)
   const handleTest = async () => {
     if (!formRef.current.reportValidity()) return
+    // 어떤 지표를 확인할지는 Exporter에 따라 다르다
+    if (!exporter) {
+      setTestState('fail')
+      setTestReason('Exporter를 선택해주세요.')
+      return
+    }
 
     setTestState('testing')
     setTestReason(null)
@@ -85,6 +91,7 @@ function PrometheusSettings() {
         }),
         job: job.trim(),
         instance: instance.trim() || null,
+        exporter,
       })
       if (res.data.data.ok) {
         setTestState('success')
