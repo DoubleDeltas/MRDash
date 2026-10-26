@@ -354,3 +354,11 @@
 .monitoring-charts-grid-fill {
   grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
 }
+
+/* 컨트롤 바 왼쪽: 보기 모드 + 기간 */
+.control-groups {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
