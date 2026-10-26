@@ -8,7 +8,8 @@ import './ServerSettings.css'
 const EXPORTERS = [
   {
     value: 'MINECRAFT_PROMETHEUS_EXPORTER',
-    label: 'PrometheusExporter 버킷 플러그인',
+    label: 'PrometheusExporter 플러그인',
+    detail: 'sladkoff/minecraft-prometheus-exporter',
     url: 'https://github.com/sladkoff/minecraft-prometheus-exporter',
   },
 ]
@@ -184,6 +185,7 @@ function PrometheusSettings() {
                   onChange={() => { setExporter(option.value); setError(null) }}
                 />
                 {option.label}
+                {option.detail && <span className="radio-option-detail">({option.detail})</span>}
                 <a
                   href={option.url}
                   target="_blank"
