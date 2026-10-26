@@ -1,7 +1,7 @@
 # MRDash
 
 마랜디 프로젝트 Discord 인증 Minecraft 서버 대시보드.  
-GitHub 저장소: `https://github.com/DoubleDeltas/MRD`
+GitHub 저장소: `https://github.com/DoubleDeltas/MRDash`
 
 ## 구조
 
