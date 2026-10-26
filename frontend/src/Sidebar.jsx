@@ -4,6 +4,20 @@ import { pages } from './pageConstants'
 import SidebarUser from './components/SidebarUser'
 import { useAuth } from './auth/AuthContext'
 
+// vite.config.js의 define으로 주입된 빌드 시각을 KST "yymmdd hh:mm"으로 표시
+const formatBuildTime = (iso) => {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Seoul',
+      year: '2-digit', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(iso)).map(p => [p.type, p.value])
+  )
+  return `${parts.year}${parts.month}${parts.day} ${parts.hour}:${parts.minute}`
+}
+
+const BUILD_LABEL = formatBuildTime(__BUILD_TIME__)
+
 function Sidebar({ isOpen, toggleSidebar, isMobile }) {
   const navigate = useNavigate()
 	const location = useLocation()
@@ -27,6 +41,7 @@ function Sidebar({ isOpen, toggleSidebar, isMobile }) {
           <div className="sidebar-header">
             <h2>MRDash</h2>
             <p className="sidebar-subtitle">MARENDI RAILWAY DASHBOARD</p>
+            <p className="sidebar-build">BUILD {BUILD_LABEL}</p>
           </div>
 
           <nav className="sidebar-menu">
