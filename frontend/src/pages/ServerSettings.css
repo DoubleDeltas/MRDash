@@ -65,8 +65,8 @@
   width: 9rem;
 }
 
-/* Exporter 선택 — 관리자 체크박스 목록과 같은 상자 안의 라디오 버튼 */
-.exporter-options {
+/* 라디오 버튼 목록 (연결 대상, Exporter) — 관리자 체크박스 목록과 같은 상자 */
+.radio-options {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -76,7 +76,7 @@
   padding: 0.6rem 0.75rem;
 }
 
-.server-form-row .exporter-option {
+.server-form-row .radio-option {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -86,7 +86,7 @@
   cursor: pointer;
 }
 
-.server-form-row .exporter-option input[type="radio"] {
+.server-form-row .radio-option input[type="radio"] {
   margin: 0;
   padding: 0;
   width: 16px;
