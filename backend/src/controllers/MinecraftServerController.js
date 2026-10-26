@@ -140,19 +140,26 @@ export const issueConsoleToken = async (req, res) => {
 export const connectMonitoringDataSource = async (req, res) => {
   try {
     const { id } = req.params;
-    const { dataSource, host, port, exporter } = req.body;
+    const { dataSource, target, host, port, exporter } = req.body;
 
     if (!Object.values(MonitoringDataSource).includes(dataSource)) {
       return res.status(400).json({ success: false, error: `dataSource must be one of: ${Object.values(MonitoringDataSource).join(', ')}` });
     }
 
-    // 지금은 Prometheus뿐이라 연결 정보도 Prometheus용 필드만 받는다
-    const trimmedHost = typeof host === 'string' ? host.trim() : '';
-    if (!trimmedHost) {
-      return res.status(400).json({ success: false, error: 'host is required' });
+    // 지금은 Prometheus뿐이라 연결 정보도 Prometheus용 필드만 받는다.
+    // target이 MRDASH면 백엔드의 PROMETHEUS_URL을 쓰므로 host/port를 비워 저장하고(null = MRDash Prometheus),
+    // EXTERNAL이면 외부 Prometheus의 host/port를 받는다.
+    if (target !== 'MRDASH' && target !== 'EXTERNAL') {
+      return res.status(400).json({ success: false, error: 'target must be one of: MRDASH, EXTERNAL' });
     }
-    if (!Number.isInteger(port) || port < 0 || port > 65535) {
-      return res.status(400).json({ success: false, error: 'port must be an integer between 0 and 65535' });
+    const trimmedHost = typeof host === 'string' ? host.trim() : '';
+    if (target === 'EXTERNAL') {
+      if (!trimmedHost) {
+        return res.status(400).json({ success: false, error: 'host is required' });
+      }
+      if (!Number.isInteger(port) || port < 0 || port > 65535) {
+        return res.status(400).json({ success: false, error: 'port must be an integer between 0 and 65535' });
+      }
     }
     if (!Object.values(PrometheusExporter).includes(exporter)) {
       return res.status(400).json({ success: false, error: `exporter must be one of: ${Object.values(PrometheusExporter).join(', ')}` });
@@ -162,8 +169,8 @@ export const connectMonitoringDataSource = async (req, res) => {
       where: { id: parseInt(id) },
       data: {
         monitoringDataSource: dataSource,
-        prometheusHost: trimmedHost,
-        prometheusPort: port,
+        prometheusHost: target === 'EXTERNAL' ? trimmedHost : null,
+        prometheusPort: target === 'EXTERNAL' ? port : null,
         prometheusExporter: exporter,
       },
       include: MANAGERS_INCLUDE,

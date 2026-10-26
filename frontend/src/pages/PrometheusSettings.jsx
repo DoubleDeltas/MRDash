@@ -13,6 +13,13 @@ const EXPORTERS = [
   },
 ]
 
+// 연결 대상: MRDash 백엔드의 Prometheus(PROMETHEUS_URL) 또는 Host/Port를 직접 입력한 외부 Prometheus.
+// MRDash로 저장하면 prometheusHost/Port가 null로 저장된다.
+const TARGETS = [
+  { value: 'MRDASH', label: 'MRDash Prometheus에 연결' },
+  { value: 'EXTERNAL', label: '외부 Prometheus에 연결' },
+]
+
 const MIN_PORT = 0
 const MAX_PORT = 65535
 // Prometheus 서버 기본 포트
@@ -29,6 +36,7 @@ function PrometheusSettings() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
 
+  const [target, setTarget] = useState('MRDASH')
   const [host, setHost] = useState('')
   const [port, setPort] = useState(String(DEFAULT_PORT))
   const [exporter, setExporter] = useState(null)
@@ -41,6 +49,7 @@ function PrometheusSettings() {
       .then(res => {
         const s = res.data.data
         setServer(s)
+        setTarget(s.prometheusHost ? 'EXTERNAL' : 'MRDASH')
         setHost(s.prometheusHost || '')
         setPort(String(s.prometheusPort ?? DEFAULT_PORT))
         setExporter(s.prometheusExporter || null)
@@ -69,8 +78,11 @@ function PrometheusSettings() {
     try {
       await apiClient.put(`/servers/${server.id}/monitoring-data-source`, {
         dataSource: 'PROMETHEUS',
-        host: host.trim(),
-        port: Number.isNaN(parsedPort) ? DEFAULT_PORT : Math.min(MAX_PORT, Math.max(MIN_PORT, parsedPort)),
+        target,
+        ...(target === 'EXTERNAL' && {
+          host: host.trim(),
+          port: Number.isNaN(parsedPort) ? DEFAULT_PORT : Math.min(MAX_PORT, Math.max(MIN_PORT, parsedPort)),
+        }),
         exporter,
       })
       navigate(`/settings/${server.id}`)
@@ -112,38 +124,58 @@ function PrometheusSettings() {
       </div>
 
       <form className="server-form" onSubmit={handleSubmit}>
-        <div className="prometheus-address-row">
-          <div className="server-form-row prometheus-host">
-            <label htmlFor="prometheus-host">Host</label>
-            <input
-              id="prometheus-host"
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              placeholder="example.marendi.kr"
-              required
-            />
-          </div>
-          <div className="server-form-row prometheus-port">
-            <label htmlFor="prometheus-port">Port</label>
-            <input
-              id="prometheus-port"
-              type="number"
-              min={MIN_PORT}
-              max={MAX_PORT}
-              step={1}
-              value={port}
-              onChange={(e) => setPort(e.target.value)}
-              onBlur={handlePortBlur}
-              required
-            />
+        <div className="server-form-row">
+          <label>Prometheus</label>
+          <div className="radio-options">
+            {TARGETS.map(option => (
+              <label key={option.value} className="radio-option">
+                <input
+                  type="radio"
+                  name="target"
+                  value={option.value}
+                  checked={target === option.value}
+                  onChange={() => setTarget(option.value)}
+                />
+                {option.label}
+              </label>
+            ))}
           </div>
         </div>
 
+        {target === 'EXTERNAL' && (
+          <div className="prometheus-address-row">
+            <div className="server-form-row prometheus-host">
+              <label htmlFor="prometheus-host">Host</label>
+              <input
+                id="prometheus-host"
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                placeholder="example.marendi.kr"
+                required
+              />
+            </div>
+            <div className="server-form-row prometheus-port">
+              <label htmlFor="prometheus-port">Port</label>
+              <input
+                id="prometheus-port"
+                type="number"
+                min={MIN_PORT}
+                max={MAX_PORT}
+                step={1}
+                value={port}
+                onChange={(e) => setPort(e.target.value)}
+                onBlur={handlePortBlur}
+                required
+              />
+            </div>
+          </div>
+        )}
+
         <div className="server-form-row">
           <label>Exporter 선택</label>
-          <div className="exporter-options">
+          <div className="radio-options">
             {EXPORTERS.map(option => (
-              <label key={option.value} className="exporter-option">
+              <label key={option.value} className="radio-option">
                 <input
                   type="radio"
                   name="exporter"
