@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { MinecraftPlatform, MonitoringDataSource, PrometheusExporter } from '@prisma/client';
 import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
+import { PrometheusHttpError, buildSelector, queryInstant } from '../util/prometheus.js';
 import { isAgentConnected } from '../ws/consoleHub.js';
 
 // 응답에는 원본 image bytes/consoleToken/prometheusToken 대신 보유 여부만 내려주고,
@@ -146,35 +147,51 @@ export const issueConsoleToken = async (req, res) => {
   }
 };
 
+// Prometheus 연결 정보(target/url/token/job/instance) 검증 — 연결 저장과 연결 테스트가 같이 쓴다.
+// target이 MRDASH면 백엔드의 PROMETHEUS_URL을 쓰므로 url/token을 비우고(url null = MRDash Prometheus),
+// EXTERNAL이면 외부 Prometheus의 url과 (선택) 인증 토큰을 받는다.
+const parsePrometheusSettings = ({ target, url, token, clearToken, job, instance }) => {
+  if (target !== 'MRDASH' && target !== 'EXTERNAL') {
+    return { error: 'target must be one of: MRDASH, EXTERNAL' };
+  }
+  const trimmedUrl = typeof url === 'string' ? url.trim() : '';
+  if (target === 'EXTERNAL' && !isValidHttpUrl(trimmedUrl)) {
+    return { error: 'url must be a valid http(s) URL' };
+  }
+  if (token !== undefined && typeof token !== 'string') {
+    return { error: 'token must be a string' };
+  }
+  const trimmedJob = typeof job === 'string' ? job.trim() : '';
+  if (!trimmedJob) {
+    return { error: 'job is required' };
+  }
+  if (instance != null && typeof instance !== 'string') {
+    return { error: 'instance must be a string' };
+  }
+  return {
+    target,
+    url: target === 'EXTERNAL' ? trimmedUrl : null,
+    token: token?.trim() || null,
+    clearToken: Boolean(clearToken),
+    job: trimmedJob,
+    instance: instance?.trim() || null,
+  };
+};
+
 // 모니터링 데이터 소스 연결
 export const connectMonitoringDataSource = async (req, res) => {
   try {
     const { id } = req.params;
-    const { dataSource, target, url, token, clearToken, job, instance, exporter } = req.body;
+    const { dataSource, exporter } = req.body;
 
     if (!Object.values(MonitoringDataSource).includes(dataSource)) {
       return res.status(400).json({ success: false, error: `dataSource must be one of: ${Object.values(MonitoringDataSource).join(', ')}` });
     }
 
     // 지금은 Prometheus뿐이라 연결 정보도 Prometheus용 필드만 받는다.
-    // target이 MRDASH면 백엔드의 PROMETHEUS_URL을 쓰므로 url/token을 비워 저장하고(url null = MRDash Prometheus),
-    // EXTERNAL이면 외부 Prometheus의 url과 (선택) 인증 토큰을 받는다.
-    if (target !== 'MRDASH' && target !== 'EXTERNAL') {
-      return res.status(400).json({ success: false, error: 'target must be one of: MRDASH, EXTERNAL' });
-    }
-    const trimmedUrl = typeof url === 'string' ? url.trim() : '';
-    if (target === 'EXTERNAL' && !isValidHttpUrl(trimmedUrl)) {
-      return res.status(400).json({ success: false, error: 'url must be a valid http(s) URL' });
-    }
-    if (token !== undefined && typeof token !== 'string') {
-      return res.status(400).json({ success: false, error: 'token must be a string' });
-    }
-    const trimmedJob = typeof job === 'string' ? job.trim() : '';
-    if (!trimmedJob) {
-      return res.status(400).json({ success: false, error: 'job is required' });
-    }
-    if (instance != null && typeof instance !== 'string') {
-      return res.status(400).json({ success: false, error: 'instance must be a string' });
+    const settings = parsePrometheusSettings(req.body);
+    if (settings.error) {
+      return res.status(400).json({ success: false, error: settings.error });
     }
     if (!Object.values(PrometheusExporter).includes(exporter)) {
       return res.status(400).json({ success: false, error: `exporter must be one of: ${Object.values(PrometheusExporter).join(', ')}` });
@@ -184,13 +201,13 @@ export const connectMonitoringDataSource = async (req, res) => {
       where: { id: parseInt(id) },
       data: {
         monitoringDataSource: dataSource,
-        prometheusUrl: target === 'EXTERNAL' ? trimmedUrl : null,
+        prometheusUrl: settings.url,
         // 토큰은 응답으로 돌려주지 않으므로, 새 값을 보냈을 때만 바꾸고 안 보내면 기존 값을 유지한다
-        ...(target === 'MRDASH' || clearToken
+        ...(settings.target === 'MRDASH' || settings.clearToken
           ? { prometheusToken: null }
-          : token?.trim() && { prometheusToken: token.trim() }),
-        prometheusJob: trimmedJob,
-        prometheusInstance: instance?.trim() || null,
+          : settings.token && { prometheusToken: settings.token }),
+        prometheusJob: settings.job,
+        prometheusInstance: settings.instance,
         prometheusExporter: exporter,
       },
       include: MANAGERS_INCLUDE,
@@ -201,6 +218,72 @@ export const connectMonitoringDataSource = async (req, res) => {
     if (error.code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Server not found' });
     }
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// 연결 테스트 실패 원인을 화면에 보여줄 문장으로
+const describePrometheusError = (error) => {
+  if (error instanceof PrometheusHttpError) {
+    if (error.status === 401 || error.status === 403) return `인증에 실패했습니다 (HTTP ${error.status}). 인증 토큰을 확인해주세요.`;
+    if (error.status === 404) return 'Prometheus API를 찾을 수 없습니다 (HTTP 404). URL을 확인해주세요.';
+    return `Prometheus가 오류를 응답했습니다 (HTTP ${error.status}).`;
+  }
+  if (error.name === 'TimeoutError') return 'Prometheus 응답 시간이 초과되었습니다 (5초).';
+  if (error.message === 'PROMETHEUS_URL is not set') return 'MRDash 백엔드에 PROMETHEUS_URL 환경변수가 설정되지 않았습니다.';
+  // fetch 실패 원인(ECONNREFUSED, ENOTFOUND 등)은 cause, 여러 주소를 시도한 경우 cause.errors 안에 있다
+  const code = error.cause?.code || error.cause?.errors?.[0]?.code;
+  return `Prometheus에 연결할 수 없습니다 (${code || error.message}). URL을 확인해주세요.`;
+};
+
+// 모니터링 데이터 소스 연결 테스트 — 저장 전 폼 값으로 Prometheus 접속, 수집 대상, 플러그인 지표를 차례로 확인한다
+export const testMonitoringDataSource = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const settings = parsePrometheusSettings(req.body);
+    if (settings.error) {
+      return res.status(400).json({ success: false, error: settings.error });
+    }
+
+    const server = await prisma.minecraftServer.findUnique({
+      where: { id: parseInt(id) },
+      select: { prometheusToken: true },
+    });
+    if (!server) {
+      return res.status(404).json({ success: false, error: 'Server not found' });
+    }
+
+    // 토큰 칸을 비워 두면 저장된 토큰으로 테스트한다 (저장할 때와 같은 규칙)
+    const token = settings.clearToken ? null : settings.token || server.prometheusToken;
+    const source = settings.url ? { baseUrl: settings.url, token } : {};
+    const selector = buildSelector(settings.job, settings.instance);
+
+    const fail = (reason) => res.json({ success: true, data: { ok: false, reason } });
+
+    let targets;
+    try {
+      targets = await queryInstant(`up{${selector}}`, source);
+    } catch (error) {
+      return fail(describePrometheusError(error));
+    }
+
+    if (targets.length === 0) {
+      return fail(settings.instance
+        ? `job="${settings.job}", instance="${settings.instance}"에 해당하는 수집 대상이 없습니다. Job Name·Targets를 확인해주세요.`
+        : `job="${settings.job}"에 해당하는 수집 대상이 없습니다. Job Name을 확인해주세요.`);
+    }
+    if (targets.every((t) => t.value[1] === '0')) {
+      return fail('수집 대상은 있지만 Prometheus가 exporter에서 지표를 가져오지 못하고 있습니다 (up=0). 서버와 플러그인 포트를 확인해주세요.');
+    }
+
+    const pluginMetrics = await queryInstant(`mc_tps{${selector}}`, source).catch(() => []);
+    if (pluginMetrics.length === 0) {
+      return fail('수집 대상은 있지만 PrometheusExporter 플러그인 지표(mc_tps)가 없습니다. 플러그인 설치를 확인해주세요.');
+    }
+
+    res.json({ success: true, data: { ok: true } });
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };

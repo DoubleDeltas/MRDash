@@ -2,6 +2,7 @@ import { WebSocketServer } from 'ws';
 import { prisma } from '../config/prisma.js';
 import { getSessionUserFromRequest } from './sessionAuth.js';
 import { handleMonitoringConnection } from './monitoringHub.js';
+import { handleServerMonitoringConnection } from './serverMonitoringHub.js';
 
 // serverId -> 에이전트 ws 연결 (서버당 하나)
 const agentSockets = new Map();
@@ -101,6 +102,16 @@ const handleBrowserConnection = (ws, serverId) => {
 
 export const isAgentConnected = (serverId) => agentSockets.has(serverId);
 
+const canAccessServer = async (user, serverId) => {
+  if (user.role === 'ADMIN') return true;
+  const server = await prisma.minecraftServer.findUnique({
+    where: { id: serverId },
+    select: { ownerId: true, managers: { select: { id: true } } },
+  });
+  if (!server) return false;
+  return server.ownerId === user.id || server.managers.some((m) => m.id === user.id);
+};
+
 export const attachConsoleHub = (httpServer) => {
   const wss = new WebSocketServer({ noServer: true });
 
@@ -123,31 +134,22 @@ export const attachConsoleHub = (httpServer) => {
       return;
     }
 
-    const consoleMatch = url.pathname.match(/^\/ws\/console\/(\d+)$/);
-    if (consoleMatch) {
+    // 서버별 콘솔/모니터링 — 둘 다 admin, 서버 소유자, 서버 관리자만 접근 가능
+    const serverMatch = url.pathname.match(/^\/ws\/(console|monitoring)\/(\d+)$/);
+    if (serverMatch) {
+      const [, kind, id] = serverMatch;
+      const serverId = Number(id);
       const user = await getSessionUserFromRequest(req);
-      const serverId = Number(consoleMatch[1]);
 
-      if (!user) {
+      if (!user || !(await canAccessServer(user, serverId))) {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
         return;
       }
-      if (user.role !== 'ADMIN') {
-        const server = await prisma.minecraftServer.findUnique({
-          where: { id: serverId },
-          select: { ownerId: true, managers: { select: { id: true } } },
-        });
-        const isOwner = server?.ownerId === user.id;
-        const isManager = server?.managers.some((m) => m.id === user.id);
-        if (!server || (!isOwner && !isManager)) {
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
-          return;
-        }
-      }
 
-      wss.handleUpgrade(req, socket, head, (ws) => handleBrowserConnection(ws, serverId));
+      wss.handleUpgrade(req, socket, head, (ws) => (kind === 'console'
+        ? handleBrowserConnection(ws, serverId)
+        : handleServerMonitoringConnection(ws, serverId)));
       return;
     }
 
