@@ -1,25 +1,25 @@
 import { isPrometheusConfigured, queryRange } from '../util/prometheus.js';
+import { pollIntervalMs, rangeWindow } from '../util/monitoringRange.js';
 
-// Prometheus scrape_interval(15s)에 맞춰 조회하고, 최근 10분치를 한 번에 내려준다.
-const STEP_SEC = 15;
-const HISTORY_POINTS = 40;
-const POLL_INTERVAL_MS = STEP_SEC * 1000;
+// 전체 모니터링 (/ws/monitoring?range=<분>) — 선택한 기간만큼을 조회 간격(step)마다 다시 조회해 한 번에 내려준다.
 const GiB = 1024 ** 3;
 
 // 컨테이너 CPU는 호스트 전체 코어 대비 %로 환산해야 누적 합이 전체 CPU 부하(%)와 같은 축에 올라간다.
-const QUERIES = {
-  totalCpu: '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m])))',
-  usedMemory: `sum(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / ${GiB}`,
-  totalMemory: `sum(node_memory_MemTotal_bytes) / ${GiB}`,
-  containerCpu:
-    'sum by (name) (rate(container_cpu_usage_seconds_total{name!=""}[1m])) * 100 / scalar(count(node_cpu_seconds_total{mode="idle"}))',
-  containerMemory: `sum by (name) (container_memory_working_set_bytes{name!=""}) / ${GiB}`,
+// rate 구간은 조회 간격보다 짧으면 그 사이 값을 건너뛰므로 step 이상(최소 1분)으로 잡는다.
+const buildQueries = (step) => {
+  const window = `${Math.max(60, step)}s`;
+  return {
+    totalCpu: `100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[${window}])))`,
+    usedMemory: `sum(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / ${GiB}`,
+    totalMemory: `sum(node_memory_MemTotal_bytes) / ${GiB}`,
+    containerCpu:
+      `sum by (name) (rate(container_cpu_usage_seconds_total{name!=""}[${window}])) * 100 / scalar(count(node_cpu_seconds_total{mode="idle"}))`,
+    containerMemory: `sum by (name) (container_memory_working_set_bytes{name!=""}) / ${GiB}`,
+  };
 };
 
-const browserSockets = new Set();
-let pollTimer = null;
-// 새로 들어온 브라우저에 바로 보여줄 마지막 결과
-let lastMessage = null;
+// 기간(분) -> { sockets, timer, lastMessage } — 같은 기간을 보는 브라우저끼리 조회 결과를 나눠 쓴다
+const rooms = new Map();
 
 const send = (ws, payload) => {
   if (ws.readyState === ws.OPEN) {
@@ -29,12 +29,11 @@ const send = (ws, payload) => {
 
 const round = (value, digits) => +Number(value).toFixed(digits);
 
-const fetchSnapshot = async () => {
-  const end = Math.floor(Date.now() / 1000 / STEP_SEC) * STEP_SEC;
-  const range = { start: end - (HISTORY_POINTS - 1) * STEP_SEC, end, step: STEP_SEC };
+const fetchSnapshot = async (minutes) => {
+  const range = rangeWindow(minutes);
 
   const [totalCpu, usedMemory, totalMemory, containerCpu, containerMemory] = await Promise.all(
-    Object.values(QUERIES).map((q) => queryRange(q, range)),
+    Object.values(buildQueries(range.step)).map((q) => queryRange(q, range)),
   );
 
   // timestamp(초) -> point
@@ -66,6 +65,8 @@ const fetchSnapshot = async () => {
 
   return {
     type: 'metrics',
+    rangeMinutes: minutes,
+    stepSec: range.step,
     memTotal,
     points: [...points.values()]
       .sort((a, b) => a.timestamp - b.timestamp)
@@ -76,13 +77,13 @@ const fetchSnapshot = async () => {
   };
 };
 
-const poll = async () => {
+const poll = async (minutes) => {
   let message;
   if (!isPrometheusConfigured()) {
     message = { type: 'unavailable', reason: 'PROMETHEUS_URL is not set' };
   } else {
     try {
-      message = await fetchSnapshot();
+      message = await fetchSnapshot(minutes);
     } catch (err) {
       console.error('[ws/monitoring] Prometheus query failed:', err.message);
       message = { type: 'unavailable', reason: err.message };
@@ -90,33 +91,31 @@ const poll = async () => {
   }
 
   // 조회하는 사이 마지막 브라우저가 나갔으면 버린다.
-  if (!pollTimer) return;
-  lastMessage = JSON.stringify(message);
-  for (const ws of browserSockets) {
-    send(ws, lastMessage);
+  const room = rooms.get(minutes);
+  if (!room) return;
+  room.lastMessage = JSON.stringify(message);
+  for (const ws of room.sockets) {
+    send(ws, room.lastMessage);
   }
 };
 
 // 보고 있는 브라우저가 있을 때만 Prometheus를 조회한다.
-const startPolling = () => {
-  if (pollTimer) return;
-  poll();
-  pollTimer = setInterval(poll, POLL_INTERVAL_MS);
-};
-
-const stopPolling = () => {
-  clearInterval(pollTimer);
-  pollTimer = null;
-  lastMessage = null;
-};
-
-export const handleMonitoringConnection = (ws) => {
-  browserSockets.add(ws);
-  if (lastMessage) send(ws, lastMessage);
-  startPolling();
+export const handleMonitoringConnection = (ws, minutes) => {
+  let room = rooms.get(minutes);
+  if (!room) {
+    room = { sockets: new Set(), timer: null, lastMessage: null };
+    rooms.set(minutes, room);
+    room.timer = setInterval(() => poll(minutes), pollIntervalMs(minutes));
+    poll(minutes);
+  }
+  room.sockets.add(ws);
+  if (room.lastMessage) send(ws, room.lastMessage);
 
   ws.on('close', () => {
-    browserSockets.delete(ws);
-    if (browserSockets.size === 0) stopPolling();
+    room.sockets.delete(ws);
+    if (room.sockets.size === 0) {
+      clearInterval(room.timer);
+      rooms.delete(minutes);
+    }
   });
 };

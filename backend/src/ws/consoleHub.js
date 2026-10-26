@@ -3,6 +3,7 @@ import { prisma } from '../config/prisma.js';
 import { getSessionUserFromRequest } from './sessionAuth.js';
 import { handleMonitoringConnection } from './monitoringHub.js';
 import { handleServerMonitoringConnection } from './serverMonitoringHub.js';
+import { parseRangeMinutes } from '../util/monitoringRange.js';
 
 // serverId -> 에이전트 ws 연결 (서버당 하나)
 const agentSockets = new Map();
@@ -130,7 +131,7 @@ export const attachConsoleHub = (httpServer) => {
         socket.destroy();
         return;
       }
-      wss.handleUpgrade(req, socket, head, (ws) => handleMonitoringConnection(ws));
+      wss.handleUpgrade(req, socket, head, (ws) => handleMonitoringConnection(ws, parseRangeMinutes(url.searchParams.get('range'))));
       return;
     }
 
@@ -149,7 +150,7 @@ export const attachConsoleHub = (httpServer) => {
 
       wss.handleUpgrade(req, socket, head, (ws) => (kind === 'console'
         ? handleBrowserConnection(ws, serverId)
-        : handleServerMonitoringConnection(ws, serverId)));
+        : handleServerMonitoringConnection(ws, serverId, parseRangeMinutes(url.searchParams.get('range')))));
       return;
     }
 

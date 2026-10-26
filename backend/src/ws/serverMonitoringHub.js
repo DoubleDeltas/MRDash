@@ -1,16 +1,14 @@
 import { prisma } from '../config/prisma.js';
 import { buildExporterQueries } from '../util/exporterMetrics.js';
 import { buildSelector, queryRange } from '../util/prometheus.js';
+import { pollIntervalMs, rangeWindow } from '../util/monitoringRange.js';
 
-// 서버별 모니터링 (/ws/monitoring/:serverId) — 서버에 설정된 Exporter의 지표(util/exporterMetrics.js)를
-// 서버 설정의 job/instance로 골라서 최근 10분치를 15초마다 내려준다.
-const STEP_SEC = 15;
-const HISTORY_POINTS = 40;
-const POLL_INTERVAL_MS = STEP_SEC * 1000;
+// 서버별 모니터링 (/ws/monitoring/:serverId?range=<분>) — 서버에 설정된 Exporter의 지표(util/exporterMetrics.js)를
+// 서버 설정의 job/instance로 골라서 선택한 기간만큼 내려준다.
 
 const DIGITS = { players: 0, tps: 2, entities: 0, chunks: 0 };
 
-// serverId -> { sockets, timer, lastMessage }
+// `${serverId}:${기간(분)}` -> { sockets, timer, lastMessage }
 const rooms = new Map();
 
 const send = (ws, payload) => {
@@ -21,7 +19,7 @@ const send = (ws, payload) => {
 
 const round = (value, digits) => +Number(value).toFixed(digits);
 
-const fetchSnapshot = async (serverId) => {
+const fetchSnapshot = async (serverId, minutes) => {
   const server = await prisma.minecraftServer.findUnique({
     where: { id: serverId },
     select: {
@@ -45,8 +43,7 @@ const fetchSnapshot = async (serverId) => {
     ? { baseUrl: server.prometheusUrl, token: server.prometheusToken }
     : {};
 
-  const end = Math.floor(Date.now() / 1000 / STEP_SEC) * STEP_SEC;
-  const range = { start: end - (HISTORY_POINTS - 1) * STEP_SEC, end, step: STEP_SEC };
+  const range = rangeWindow(minutes);
 
   const keys = Object.keys(queries);
   const results = await Promise.all(keys.map((k) => queryRange(queries[k], range, source)));
@@ -70,21 +67,23 @@ const fetchSnapshot = async (serverId) => {
 
   return {
     type: 'metrics',
+    rangeMinutes: minutes,
+    stepSec: range.step,
     points: [...points.values()].sort((a, b) => a.timestamp - b.timestamp),
   };
 };
 
-const poll = async (serverId) => {
+const poll = async (roomKey, serverId, minutes) => {
   let message;
   try {
-    message = await fetchSnapshot(serverId);
+    message = await fetchSnapshot(serverId, minutes);
   } catch (err) {
     console.error(`[ws/monitoring/${serverId}] Prometheus query failed:`, err.message);
     message = { type: 'unavailable', reason: err.message };
   }
 
   // 조회하는 사이 마지막 브라우저가 나갔으면 버린다.
-  const room = rooms.get(serverId);
+  const room = rooms.get(roomKey);
   if (!room) return;
   room.lastMessage = JSON.stringify(message);
   for (const ws of room.sockets) {
@@ -93,13 +92,14 @@ const poll = async (serverId) => {
 };
 
 // 그 서버 모니터링 화면을 보고 있는 브라우저가 있을 때만 조회한다.
-export const handleServerMonitoringConnection = (ws, serverId) => {
-  let room = rooms.get(serverId);
+export const handleServerMonitoringConnection = (ws, serverId, minutes) => {
+  const roomKey = `${serverId}:${minutes}`;
+  let room = rooms.get(roomKey);
   if (!room) {
     room = { sockets: new Set(), timer: null, lastMessage: null };
-    rooms.set(serverId, room);
-    room.timer = setInterval(() => poll(serverId), POLL_INTERVAL_MS);
-    poll(serverId);
+    rooms.set(roomKey, room);
+    room.timer = setInterval(() => poll(roomKey, serverId, minutes), pollIntervalMs(minutes));
+    poll(roomKey, serverId, minutes);
   }
   room.sockets.add(ws);
   if (room.lastMessage) send(ws, room.lastMessage);
@@ -108,7 +108,7 @@ export const handleServerMonitoringConnection = (ws, serverId) => {
     room.sockets.delete(ws);
     if (room.sockets.size === 0) {
       clearInterval(room.timer);
-      rooms.delete(serverId);
+      rooms.delete(roomKey);
     }
   });
 };

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { WS_BASE_URL } from '../api/client'
 import LineChart from '../components/LineChart'
 import { maxScale, formatTick } from '../components/chartScale'
+import MonitoringRangeSelect, { DEFAULT_RANGE_MINUTES, formatStep } from '../components/MonitoringRangeSelect'
 import './Monitoring.css'
 
 // 다크 테마 categorical 팔레트 (dataviz/palette.md) — 컨테이너 이름순으로 배정
@@ -203,15 +204,20 @@ function Monitoring() {
   // 'connecting': 백엔드 ws 연결 중 / 'ok': 데이터 수신 중 / 'unavailable': 백엔드가 Prometheus 조회에 실패
   const [status, setStatus] = useState('connecting')
   const [metrics, setMetrics] = useState({ data: [], containers: [], memTotal: 0 })
+  const [rangeMinutes, setRangeMinutes] = useState(DEFAULT_RANGE_MINUTES)
+  // 백엔드가 기간에 맞춰 정한 조회 간격(초) — 기간이 길수록 길어진다
+  const [stepSec, setStepSec] = useState(null)
 
-  // 화면을 보고 있는 동안 백엔드가 15초마다 Prometheus 조회 결과(최근 10분치)를 밀어준다.
+  // 화면을 보고 있는 동안 백엔드가 선택한 기간의 Prometheus 조회 결과를 밀어준다.
+  // 기간을 바꾸면 새 기간으로 다시 연결한다 (새 데이터가 올 때까지는 이전 그래프를 보여준다).
   useEffect(() => {
+    setStatus(prev => (prev === 'unavailable' ? prev : 'connecting'))
     let reconnectTimer = null
     let cancelled = false
     let ws = null
 
     const connect = () => {
-      ws = new WebSocket(`${WS_BASE_URL}/ws/monitoring`)
+      ws = new WebSocket(`${WS_BASE_URL}/ws/monitoring?range=${rangeMinutes}`)
 
       ws.onmessage = (event) => {
         let msg
@@ -223,6 +229,7 @@ function Monitoring() {
 
         if (msg.type === 'metrics') {
           setMetrics({ ...decoratePoints(msg.points), memTotal: msg.memTotal })
+          setStepSec(msg.stepSec)
           setStatus('ok')
         } else if (msg.type === 'unavailable') {
           setStatus('unavailable')
@@ -245,7 +252,7 @@ function Monitoring() {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       ws?.close()
     }
-  }, [])
+  }, [rangeMinutes])
 
   const { data, containers, memTotal } = metrics
   const currentPoint = data[data.length - 1] || {}
@@ -328,23 +335,26 @@ function Monitoring() {
 
       {/* 상단 컨트롤 바 */}
       <div className="monitoring-controls-bar">
-        <div className="control-group">
-          <label htmlFor="view-mode-select" className="control-label">보기 모드</label>
-          <select
-            id="view-mode-select"
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value)}
-            className="monitoring-select"
-          >
-            <option value="total">전체</option>
-            <option value="container">Docker 컨테이너별</option>
-          </select>
+        <div className="control-groups">
+          <div className="control-group">
+            <label htmlFor="view-mode-select" className="control-label">보기 모드</label>
+            <select
+              id="view-mode-select"
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              className="monitoring-select"
+            >
+              <option value="total">전체</option>
+              <option value="container">Docker 컨테이너별</option>
+            </select>
+          </div>
+          <MonitoringRangeSelect value={rangeMinutes} onChange={setRangeMinutes} />
         </div>
 
         <div className="control-actions">
           <span className={`live-indicator ${status === 'ok' ? '' : 'live-indicator-off'}`}>
             <span className="live-dot" />
-            {status === 'ok' ? '실시간 (15초 주기)' : '재연결 중...'}
+            {status === 'ok' ? `실시간 (${formatStep(stepSec)} 주기)` : '불러오는 중...'}
           </span>
         </div>
       </div>

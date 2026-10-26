@@ -2,8 +2,9 @@ import { useState, useMemo, useRef } from 'react'
 import { formatTick } from './chartScale'
 
 // 꺾은선 그래프 (모니터링 페이지 공용) — 스타일은 pages/Monitoring.css
-// minVal(기본 0)~maxVal 범위를 그리고, 범위 밖의 값은 위/아래 끝에 붙인다
-function LineChart({ data, dataKey, unit, minVal = 0, maxVal, title, color }) {
+// minVal(기본 0)~maxVal 범위를 그리고, 범위 밖의 값은 위/아래 끝에 붙인다.
+// referenceLines: 기준값에 긋는 보조선 (예: TPS 20) — 축 범위 밖이면 그리지 않는다
+function LineChart({ data, dataKey, unit, minVal = 0, maxVal, title, color, referenceLines = [] }) {
   const svgRef = useRef(null)
   const [hoverIdx, setHoverIdx] = useState(null)
 
@@ -150,6 +151,30 @@ function LineChart({ data, dataKey, unit, minVal = 0, maxVal, title, color }) {
               </text>
             )
           })}
+
+          {/* 보조선 (기준값) */}
+          {referenceLines
+            .filter(value => value >= minVal && value <= maxVal)
+            .map(value => {
+              const y = padTop + plotH - ((value - minVal) / (maxVal - minVal)) * plotH
+              return (
+                <g key={value}>
+                  <line
+                    x1={padLeft}
+                    y1={y}
+                    x2={width - padRight}
+                    y2={y}
+                    stroke={color}
+                    strokeOpacity="0.7"
+                    strokeWidth="1"
+                    strokeDasharray="6 4"
+                  />
+                  <text x={width - padRight - 4} y={y - 4} textAnchor="end" className="chart-axis-text">
+                    {value}
+                  </text>
+                </g>
+              )
+            })}
 
           {/* 데이터 영역 면 워시 (10% 투명도) */}
           <path d={areaD} fill={color} fillOpacity="0.12" />
