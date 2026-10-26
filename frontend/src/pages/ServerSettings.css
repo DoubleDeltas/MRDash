@@ -86,6 +86,11 @@
   cursor: pointer;
 }
 
+.radio-option-detail {
+  color: #72767d;
+  font-size: 0.75rem;
+}
+
 .server-form-row .radio-option input[type="radio"] {
   margin: 0;
   padding: 0;
