@@ -296,7 +296,7 @@ function MinecraftServers() {
                     onMouseEnter={() => setHoveredButtonId(`monitoring-${server.id}`)}
                     onMouseLeave={() => setHoveredButtonId(null)}
                   >
-                    <button className="action-button">
+                    <button className="action-button" onClick={() => navigate(`/monitoring/${server.id}`)}>
                       <span className="material-icons">monitor_heart</span>
                     </button>
                     {hoveredButtonId === `monitoring-${server.id}` && (

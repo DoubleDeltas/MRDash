@@ -332,3 +332,25 @@
   font-weight: 600;
   color: #FFFFFF;
 }
+
+/* 서버별 모니터링: 일반 / 부하 섹션 */
+.monitoring-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.monitoring-section-title {
+  margin: 0;
+  color: #FFFFFF;
+  font-size: 1.1rem;
+}
+
+.monitoring-status-link {
+  color: #7289DA;
+}
+
+/* 차트가 하나뿐인 섹션도 다른 섹션과 같은 칸 너비를 유지 (auto-fit은 한 개를 한 줄 전체로 늘린다) */
+.monitoring-charts-grid-fill {
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+}

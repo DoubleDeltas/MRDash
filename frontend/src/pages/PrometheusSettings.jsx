@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
@@ -42,6 +42,10 @@ function PrometheusSettings() {
   const [exporter, setExporter] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  // 연결 테스트 결과: 'idle'(검은 램프) | 'testing' | 'success'(초록) | 'fail'(빨강, 아래에 원인 표시)
+  const [testState, setTestState] = useState('idle')
+  const [testReason, setTestReason] = useState(null)
+  const formRef = useRef(null)
 
   useEffect(() => {
     setLoading(true)
@@ -58,6 +62,41 @@ function PrometheusSettings() {
       .catch(() => setLoadError('서버 정보를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [serverId])
+
+  // 입력이 바뀌면 이전 테스트 결과는 더 이상 맞지 않으므로 램프를 끈다
+  useEffect(() => {
+    setTestState('idle')
+    setTestReason(null)
+  }, [target, url, token, clearToken, job, instance])
+
+  // 저장 전 폼 값 그대로 테스트한다 (토큰 칸이 비어 있으면 저장된 토큰 사용)
+  const handleTest = async () => {
+    if (!formRef.current.reportValidity()) return
+
+    setTestState('testing')
+    setTestReason(null)
+    try {
+      const res = await apiClient.post(`/servers/${server.id}/monitoring-data-source/test`, {
+        target,
+        ...(target === 'EXTERNAL' && {
+          url: url.trim(),
+          ...(token.trim() && { token: token.trim() }),
+          ...(clearToken && { clearToken: true }),
+        }),
+        job: job.trim(),
+        instance: instance.trim() || null,
+      })
+      if (res.data.data.ok) {
+        setTestState('success')
+      } else {
+        setTestState('fail')
+        setTestReason(res.data.data.reason)
+      }
+    } catch (err) {
+      setTestState('fail')
+      setTestReason(err.response?.data?.error || '연결 테스트 요청에 실패했습니다.')
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -119,7 +158,7 @@ function PrometheusSettings() {
         </h2>
       </div>
 
-      <form className="server-form" onSubmit={handleSubmit}>
+      <form className="server-form" onSubmit={handleSubmit} ref={formRef}>
         <div className="server-form-row">
           <label>Prometheus</label>
           <div className="radio-options">
@@ -230,6 +269,31 @@ function PrometheusSettings() {
               </label>
             ))}
           </div>
+        </div>
+
+        <div className="server-form-row">
+          <div className="connection-test-row">
+            <button
+              type="button"
+              className="console-token-button"
+              onClick={handleTest}
+              disabled={testState === 'testing'}
+            >
+              {testState === 'testing' ? '테스트 중...' : '연결 테스트'}
+            </button>
+            <span
+              className={`connection-test-lamp ${testState}`}
+              role="status"
+              aria-label={
+                testState === 'success' ? '연결 성공'
+                  : testState === 'fail' ? '연결 실패'
+                    : testState === 'testing' ? '테스트 중' : '테스트 전'
+              }
+            />
+          </div>
+          {testState === 'fail' && testReason && (
+            <p className="connection-test-reason">{testReason}</p>
+          )}
         </div>
 
         {error && <p className="server-form-error">{error}</p>}
