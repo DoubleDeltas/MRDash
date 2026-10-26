@@ -149,6 +149,10 @@ function ServerSettings() {
 
   return (
     <div className="server-settings">
+      <div className="settings-header">
+        <h2>설정</h2>
+      </div>
+
       <form className="server-form" onSubmit={handleEditSubmit}>
         <ServerFormFields
           form={editForm}

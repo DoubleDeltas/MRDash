@@ -85,6 +85,13 @@
   font-weight: 600;
 }
 
+.sidebar-build {
+  margin: 0.25rem 0 0 0;
+  color: #72767d;
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+}
+
 .sidebar-menu {
   flex: 1;
   display: flex;

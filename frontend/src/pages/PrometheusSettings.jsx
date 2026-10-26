@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import './MinecraftServers.css'
@@ -15,6 +15,8 @@ const EXPORTERS = [
 
 const MIN_PORT = 0
 const MAX_PORT = 65535
+// Prometheus 서버 기본 포트
+const DEFAULT_PORT = 9090
 
 // 서버별 Prometheus 데이터 소스 설정 — 처음 연결할 때와 연결된 설정을 고칠 때 같이 쓴다.
 function PrometheusSettings() {
@@ -28,7 +30,7 @@ function PrometheusSettings() {
   const [loadError, setLoadError] = useState(null)
 
   const [host, setHost] = useState('')
-  const [port, setPort] = useState(String(MIN_PORT))
+  const [port, setPort] = useState(String(DEFAULT_PORT))
   const [exporter, setExporter] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -40,17 +42,17 @@ function PrometheusSettings() {
         const s = res.data.data
         setServer(s)
         setHost(s.prometheusHost || '')
-        setPort(String(s.prometheusPort ?? MIN_PORT))
+        setPort(String(s.prometheusPort ?? DEFAULT_PORT))
         setExporter(s.prometheusExporter || null)
       })
       .catch(() => setLoadError('서버 정보를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [serverId])
 
-  // 직접 입력한 값은 포커스를 잃을 때 0~65535 범위의 정수로 맞춘다
+  // 직접 입력한 값은 포커스를 잃을 때 0~65535 범위의 정수로 맞춘다 (비우면 기본 포트)
   const handlePortBlur = () => {
     const parsed = parseInt(port, 10)
-    const clamped = Number.isNaN(parsed) ? MIN_PORT : Math.min(MAX_PORT, Math.max(MIN_PORT, parsed))
+    const clamped = Number.isNaN(parsed) ? DEFAULT_PORT : Math.min(MAX_PORT, Math.max(MIN_PORT, parsed))
     setPort(String(clamped))
   }
 
@@ -68,7 +70,7 @@ function PrometheusSettings() {
       await apiClient.put(`/servers/${server.id}/monitoring-data-source`, {
         dataSource: 'PROMETHEUS',
         host: host.trim(),
-        port: Number.isNaN(parsedPort) ? MIN_PORT : Math.min(MAX_PORT, Math.max(MIN_PORT, parsedPort)),
+        port: Number.isNaN(parsedPort) ? DEFAULT_PORT : Math.min(MAX_PORT, Math.max(MIN_PORT, parsedPort)),
         exporter,
       })
       navigate(`/settings/${server.id}`)
@@ -101,6 +103,14 @@ function PrometheusSettings() {
 
   return (
     <div className="server-settings">
+      <div className="settings-header">
+        <h2>
+          <Link to={`/settings/${server.id}`} className="settings-header-link">설정</Link>
+          <span className="settings-header-separator">&gt;</span>
+          Prometheus 연결
+        </h2>
+      </div>
+
       <form className="server-form" onSubmit={handleSubmit}>
         <div className="prometheus-address-row">
           <div className="server-form-row prometheus-host">
@@ -133,10 +143,7 @@ function PrometheusSettings() {
           <label>Exporter 선택</label>
           <div className="exporter-options">
             {EXPORTERS.map(option => (
-              <label
-                key={option.value}
-                className={`exporter-option ${exporter === option.value ? 'selected' : ''}`}
-              >
+              <label key={option.value} className="exporter-option">
                 <input
                   type="radio"
                   name="exporter"
