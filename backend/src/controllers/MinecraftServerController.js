@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { MinecraftPlatform, MonitoringDataSource, PrometheusExporter } from '@prisma/client';
 import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
+import { EXPORTER_METRICS } from '../util/exporterMetrics.js';
 import { PrometheusHttpError, buildSelector, queryInstant } from '../util/prometheus.js';
 import { isAgentConnected } from '../ws/consoleHub.js';
 
@@ -236,7 +237,7 @@ const describePrometheusError = (error) => {
   return `Prometheus에 연결할 수 없습니다 (${code || error.message}). URL을 확인해주세요.`;
 };
 
-// 모니터링 데이터 소스 연결 테스트 — 저장 전 폼 값으로 Prometheus 접속, 수집 대상, 플러그인 지표를 차례로 확인한다
+// 모니터링 데이터 소스 연결 테스트 — 저장 전 폼 값으로 Prometheus 접속, 수집 대상, 선택한 Exporter의 지표를 차례로 확인한다
 export const testMonitoringDataSource = async (req, res) => {
   try {
     const { id } = req.params;
@@ -244,6 +245,10 @@ export const testMonitoringDataSource = async (req, res) => {
     const settings = parsePrometheusSettings(req.body);
     if (settings.error) {
       return res.status(400).json({ success: false, error: settings.error });
+    }
+    const exporter = EXPORTER_METRICS[req.body.exporter];
+    if (!exporter) {
+      return res.status(400).json({ success: false, error: `exporter must be one of: ${Object.keys(EXPORTER_METRICS).join(', ')}` });
     }
 
     const server = await prisma.minecraftServer.findUnique({
@@ -277,9 +282,10 @@ export const testMonitoringDataSource = async (req, res) => {
       return fail('수집 대상은 있지만 Prometheus가 exporter에서 지표를 가져오지 못하고 있습니다 (up=0). 서버와 플러그인 포트를 확인해주세요.');
     }
 
-    const pluginMetrics = await queryInstant(`mc_tps{${selector}}`, source).catch(() => []);
-    if (pluginMetrics.length === 0) {
-      return fail('수집 대상은 있지만 PrometheusExporter 플러그인 지표(mc_tps)가 없습니다. 플러그인 설치를 확인해주세요.');
+    const probeMetric = exporter.metrics[exporter.probe].metric;
+    const exporterMetrics = await queryInstant(`${probeMetric}{${selector}}`, source).catch(() => []);
+    if (exporterMetrics.length === 0) {
+      return fail(`수집 대상은 있지만 ${exporter.label} 지표(${probeMetric})가 없습니다. ${exporter.label} 설치를 확인해주세요.`);
     }
 
     res.json({ success: true, data: { ok: true } });

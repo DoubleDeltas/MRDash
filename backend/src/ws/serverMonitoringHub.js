@@ -1,18 +1,12 @@
 import { prisma } from '../config/prisma.js';
+import { buildExporterQueries } from '../util/exporterMetrics.js';
 import { buildSelector, queryRange } from '../util/prometheus.js';
 
-// 서버별 모니터링 (/ws/monitoring/:serverId) — PrometheusExporter 플러그인(sladkoff/minecraft-prometheus-exporter) 지표를
+// 서버별 모니터링 (/ws/monitoring/:serverId) — 서버에 설정된 Exporter의 지표(util/exporterMetrics.js)를
 // 서버 설정의 job/instance로 골라서 최근 10분치를 15초마다 내려준다.
 const STEP_SEC = 15;
 const HISTORY_POINTS = 40;
 const POLL_INTERVAL_MS = STEP_SEC * 1000;
-
-const buildQueries = (selector) => ({
-  players: `sum(mc_players_online_total{${selector}})`,
-  tps: `avg(mc_tps{${selector}})`,
-  entities: `sum(mc_entities_total{${selector}})`,
-  chunks: `sum(mc_loaded_chunks_total{${selector}})`,
-});
 
 const DIGITS = { players: 0, tps: 2, entities: 0, chunks: 0 };
 
@@ -36,14 +30,15 @@ const fetchSnapshot = async (serverId) => {
       prometheusToken: true,
       prometheusJob: true,
       prometheusInstance: true,
+      prometheusExporter: true,
     },
   });
 
-  if (!server || server.monitoringDataSource !== 'PROMETHEUS' || !server.prometheusJob) {
+  const selector = server?.prometheusJob && buildSelector(server.prometheusJob, server.prometheusInstance);
+  const queries = selector && buildExporterQueries(server.prometheusExporter, selector);
+  if (server?.monitoringDataSource !== 'PROMETHEUS' || !queries) {
     return { type: 'not-connected' };
   }
-
-  const selector = buildSelector(server.prometheusJob, server.prometheusInstance);
 
   // prometheusUrl이 없으면 MRDash Prometheus(PROMETHEUS_URL)를 쓴다
   const source = server.prometheusUrl
@@ -53,7 +48,6 @@ const fetchSnapshot = async (serverId) => {
   const end = Math.floor(Date.now() / 1000 / STEP_SEC) * STEP_SEC;
   const range = { start: end - (HISTORY_POINTS - 1) * STEP_SEC, end, step: STEP_SEC };
 
-  const queries = buildQueries(selector);
   const keys = Object.keys(queries);
   const results = await Promise.all(keys.map((k) => queryRange(queries[k], range, source)));
   const series = Object.fromEntries(keys.map((k, i) => [k, results[i][0]?.values ?? []]));
