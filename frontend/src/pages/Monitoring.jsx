@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { WS_BASE_URL } from '../api/client'
 import LineChart from '../components/LineChart'
+import { maxScale, formatTick } from '../components/chartScale'
 import './Monitoring.css'
 
 // 다크 테마 categorical 팔레트 (dataviz/palette.md) — 컨테이너 이름순으로 배정
@@ -41,7 +42,8 @@ function StackedBarChart({ data, containers, metric, unit, maxVal, title }) {
   const barWidth = Math.min(24, Math.max(4, step - 4))
 
   const yTicks = [0, 0.25, 0.5, 0.75, 1.0].map(ratio => ({
-    val: Math.round(maxVal * ratio),
+    ratio,
+    val: formatTick(maxVal * ratio, maxVal),
     y: padTop + plotH - ratio * plotH,
   }))
 
@@ -87,7 +89,7 @@ function StackedBarChart({ data, containers, metric, unit, maxVal, title }) {
         >
           {/* Y축 그리드선 및 라벨 */}
           {yTicks.map(t => (
-            <g key={t.val}>
+            <g key={t.ratio}>
               <line
                 x1={padLeft}
                 y1={t.y}
@@ -355,7 +357,7 @@ function Monitoring() {
               data={data}
               dataKey="totalCpu"
               unit="%"
-              maxVal={100}
+              maxVal={maxScale(data.map(d => d.totalCpu), { cap: 100 })}
               title="CPU 부하 (전체 %)"
               color="#3987e5"
             />
@@ -375,7 +377,7 @@ function Monitoring() {
               containers={containers}
               metric="cpu"
               unit="%"
-              maxVal={100}
+              maxVal={maxScale(data.map(d => d.containers.reduce((sum, c) => sum + c.cpu, 0)), { cap: 100 })}
               title="CPU 부하 (컨테이너별 누적 %)"
             />
             <StackedBarChart

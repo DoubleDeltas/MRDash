@@ -6,21 +6,15 @@ import { buildSelector, queryRange } from '../util/prometheus.js';
 const STEP_SEC = 15;
 const HISTORY_POINTS = 40;
 const POLL_INTERVAL_MS = STEP_SEC * 1000;
-const GiB = 1024 ** 3;
 
-const buildQueries = (selector) => {
-  const sel = (extra = '') => `{${[selector, extra].filter(Boolean).join(',')}}`;
-  return {
-    players: `sum(mc_players_online_total${sel()})`,
-    tps: `avg(mc_tps${sel()})`,
-    entities: `sum(mc_entities_total${sel()})`,
-    chunks: `sum(mc_loaded_chunks_total${sel()})`,
-    jvmUsed: `(sum(mc_jvm_memory${sel('type="allocated"')}) - sum(mc_jvm_memory${sel('type="free"')})) / ${GiB}`,
-    jvmMax: `max(mc_jvm_memory${sel('type="max"')}) / ${GiB}`,
-  };
-};
+const buildQueries = (selector) => ({
+  players: `sum(mc_players_online_total{${selector}})`,
+  tps: `avg(mc_tps{${selector}})`,
+  entities: `sum(mc_entities_total{${selector}})`,
+  chunks: `sum(mc_loaded_chunks_total{${selector}})`,
+});
 
-const DIGITS = { players: 0, tps: 2, entities: 0, chunks: 0, jvmUsed: 2 };
+const DIGITS = { players: 0, tps: 2, entities: 0, chunks: 0 };
 
 // serverId -> { sockets, timer, lastMessage }
 const rooms = new Map();
@@ -74,16 +68,14 @@ const fetchSnapshot = async (serverId) => {
   for (const key of Object.keys(DIGITS)) {
     for (const [ts, v] of series[key]) {
       if (!points.has(ts)) {
-        points.set(ts, { timestamp: ts * 1000, players: null, tps: null, entities: null, chunks: null, jvmUsed: null });
+        points.set(ts, { timestamp: ts * 1000, players: null, tps: null, entities: null, chunks: null });
       }
       points.get(ts)[key] = round(v, DIGITS[key]);
     }
   }
 
-  const jvmMaxValues = series.jvmMax;
   return {
     type: 'metrics',
-    jvmMax: jvmMaxValues.length ? round(jvmMaxValues.at(-1)[1], 2) : null,
     points: [...points.values()].sort((a, b) => a.timestamp - b.timestamp),
   };
 };

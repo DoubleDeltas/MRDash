@@ -2,13 +2,25 @@ import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { WS_BASE_URL } from '../api/client'
 import LineChart from '../components/LineChart'
+import { maxScale } from '../components/chartScale'
 import './Monitoring.css'
 
-// 데이터 범위에 맞는 축 최댓값 (1·2·5 × 10ⁿ 중 값보다 10% 이상 큰 것, 최소 minimum)
-const niceMax = (values, minimum) => {
-  const top = Math.max(minimum, ...values.filter(v => v != null)) * 1.1
-  const magnitude = 10 ** Math.floor(Math.log10(top))
-  return [1, 2, 5, 10].map(m => m * magnitude).find(v => v >= top)
+// 접속자·엔티티·청크 수는 정수라 눈금 간격을 1 이상으로, 값이 없을 때는 0~4
+const COUNT_SCALE = { fallback: 4, minStep: 1 }
+
+// TPS 축은 기본 19.0~20.1, 관측값이 이 범위를 벗어날 때만 넓힌다
+const TPS_DEFAULT_MIN = 19.0
+const TPS_DEFAULT_MAX = 20.1
+
+const tpsRange = (values) => {
+  const observed = values.filter(v => v != null)
+  if (!observed.length) return { min: TPS_DEFAULT_MIN, max: TPS_DEFAULT_MAX }
+  const low = Math.min(...observed)
+  const high = Math.max(...observed)
+  return {
+    min: low < TPS_DEFAULT_MIN ? Math.max(0, Math.floor(low)) : TPS_DEFAULT_MIN,
+    max: high > TPS_DEFAULT_MAX ? Math.ceil(high * 10) / 10 : TPS_DEFAULT_MAX,
+  }
 }
 
 // 서버별 모니터링 — PrometheusExporter 플러그인 지표를 백엔드 /ws/monitoring/:serverId 스트림으로 받는다.
@@ -16,7 +28,7 @@ function ServerMonitoring() {
   const { serverId } = useParams()
   // 'connecting' | 'ok' | 'not-connected' | 'no-data' | 'unavailable'
   const [status, setStatus] = useState('connecting')
-  const [metrics, setMetrics] = useState({ data: [], jvmMax: null })
+  const [metrics, setMetrics] = useState({ data: [] })
 
   useEffect(() => {
     let reconnectTimer = null
@@ -37,7 +49,6 @@ function ServerMonitoring() {
         if (msg.type === 'metrics') {
           setMetrics({
             data: msg.points.map(p => ({ ...p, time: new Date(p.timestamp).toTimeString().slice(0, 5) })),
-            jvmMax: msg.jvmMax,
           })
           setStatus('ok')
         } else if (['not-connected', 'no-data', 'unavailable'].includes(msg.type)) {
@@ -102,7 +113,7 @@ function ServerMonitoring() {
     )
   }
 
-  const { data, jvmMax } = metrics
+  const { data } = metrics
   if (data.length < 2) {
     return (
       <div className="monitoring-page">
@@ -115,6 +126,7 @@ function ServerMonitoring() {
   }
 
   const values = (key) => data.map(d => d[key])
+  const tps = tpsRange(values('tps'))
 
   return (
     <div className="monitoring-page">
@@ -125,7 +137,7 @@ function ServerMonitoring() {
             data={data}
             dataKey="players"
             unit="명"
-            maxVal={niceMax(values('players'), 5)}
+            maxVal={maxScale(values('players'), COUNT_SCALE)}
             title="접속자 수"
             color="#3987e5"
           />
@@ -137,17 +149,10 @@ function ServerMonitoring() {
         <div className="monitoring-charts-grid">
           <LineChart
             data={data}
-            dataKey="jvmUsed"
-            unit="GB"
-            maxVal={jvmMax || niceMax(values('jvmUsed'), 1)}
-            title={jvmMax ? `JVM 메모리 (최대 ${jvmMax} GB)` : 'JVM 메모리'}
-            color="#199e70"
-          />
-          <LineChart
-            data={data}
             dataKey="tps"
             unit="TPS"
-            maxVal={20}
+            minVal={tps.min}
+            maxVal={tps.max}
             title="TPS"
             color="#c98500"
           />
@@ -155,7 +160,7 @@ function ServerMonitoring() {
             data={data}
             dataKey="entities"
             unit="개"
-            maxVal={niceMax(values('entities'), 10)}
+            maxVal={maxScale(values('entities'), COUNT_SCALE)}
             title="엔티티 수"
             color="#d55181"
           />
@@ -163,7 +168,7 @@ function ServerMonitoring() {
             data={data}
             dataKey="chunks"
             unit="개"
-            maxVal={niceMax(values('chunks'), 10)}
+            maxVal={maxScale(values('chunks'), COUNT_SCALE)}
             title="로드된 청크 수"
             color="#9085e9"
           />
