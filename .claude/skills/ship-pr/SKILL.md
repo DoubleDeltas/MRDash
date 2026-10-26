@@ -74,6 +74,19 @@ EOF
 
   `mergeStateStatus: CLEAN` + `mergeable: MERGEABLE` → merge. Anything
   else (`BLOCKED`, `DIRTY`, failing checks) → stop and tell the user why.
+- Right after `gh pr create`, GitHub may not have computed mergeability
+  yet, so both fields come back `UNKNOWN`. That's not a failure. Re-check
+  a few times before deciding:
+
+  ```bash
+  for i in 1 2 3 4 5; do
+    r=$(gh pr view <n> --json mergeable,mergeStateStatus -q '.mergeable+" "+.mergeStateStatus')
+    echo "$r"
+    case "$r" in *UNKNOWN*) sleep 3;; *) break;; esac
+  done
+  ```
+
+  If it's still `UNKNOWN` after that, stop and tell the user. Don't merge blind.
 - Merge with a merge commit, like the earlier PRs ("Merge pull request #n …"):
 
   ```bash
