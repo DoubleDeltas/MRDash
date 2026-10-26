@@ -1,7 +1,9 @@
 import { useState, useMemo, useRef } from 'react'
+import { formatTick } from './chartScale'
 
 // 꺾은선 그래프 (모니터링 페이지 공용) — 스타일은 pages/Monitoring.css
-function LineChart({ data, dataKey, unit, maxVal, title, color }) {
+// minVal(기본 0)~maxVal 범위를 그리고, 범위 밖의 값은 위/아래 끝에 붙인다
+function LineChart({ data, dataKey, unit, minVal = 0, maxVal, title, color }) {
   const svgRef = useRef(null)
   const [hoverIdx, setHoverIdx] = useState(null)
 
@@ -22,11 +24,11 @@ function LineChart({ data, dataKey, unit, maxVal, title, color }) {
       const val = d[dataKey]
       // 값이 없는 시점(null)은 선을 끊는다
       if (val == null) return { x, y: null, val: null, time: d.time }
-      const yVal = Math.min(maxVal, Math.max(0, val))
-      const y = padTop + plotH - (yVal / maxVal) * plotH
+      const yVal = Math.min(maxVal, Math.max(minVal, val))
+      const y = padTop + plotH - ((yVal - minVal) / (maxVal - minVal)) * plotH
       return { x, y, val, time: d.time }
     })
-  }, [data, dataKey, maxVal, plotW, plotH])
+  }, [data, dataKey, minVal, maxVal, plotW, plotH])
 
   // null로 끊긴 구간별로 선/면을 그린다
   const segments = useMemo(() => {
@@ -56,15 +58,12 @@ function LineChart({ data, dataKey, unit, maxVal, title, color }) {
     }).join(' ')
   }, [segments, padTop, plotH])
 
-  // Y축 눈금선 (4단계) — 범위가 작으면(예: 메모리 6GB) 소수 첫째 자리까지 표시
-  const yTicks = [0, 0.25, 0.5, 0.75, 1.0].map(ratio => {
-    const raw = maxVal * ratio
-    return {
-      ratio,
-      val: Number.isInteger(raw) || maxVal >= 20 ? Math.round(raw) : +raw.toFixed(1),
-      y: padTop + plotH - ratio * plotH,
-    }
-  })
+  // Y축 눈금선 (4단계) — 범위가 작으면(예: TPS 19.0~20.1) 소수 첫째 자리까지 표시
+  const yTicks = [0, 0.25, 0.5, 0.75, 1.0].map(ratio => ({
+    ratio,
+    val: formatTick(minVal + (maxVal - minVal) * ratio, maxVal - minVal),
+    y: padTop + plotH - ratio * plotH,
+  }))
 
   const handlePointerMove = (e) => {
     const rect = svgRef.current?.getBoundingClientRect()
