@@ -50,28 +50,33 @@
   padding: 0.35rem 1rem 0.35rem 0.5rem;
 }
 
-/* Prometheus 설정: Host / Port 한 줄 */
-.prometheus-address-row {
+/* Prometheus 설정: 외부 Prometheus 선택 시 같은 상자 안에 나오는 URL/토큰 입력 —
+   라디오 글자 위치에 맞춰 들여쓰고, 상자와 구분되게 입력칸 배경을 밝힌다 */
+.prometheus-external-fields {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.25rem 0 0.25rem calc(16px + 0.5rem);
 }
 
-.prometheus-host {
+.prometheus-external-fields input {
+  background: #2F3136;
+}
+
+.prometheus-token-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.prometheus-token-row input {
   flex: 1;
   min-width: 0;
 }
 
-.prometheus-port {
-  width: 9rem;
-}
-
-/* 라디오 상자 안에서는 라디오 글자 위치에 맞춰 들여쓰고, 상자와 구분되게 입력칸 배경을 밝힌다 */
-.radio-options .prometheus-address-row {
-  margin: 0.25rem 0 0.25rem calc(16px + 0.5rem);
-}
-
-.radio-options .prometheus-address-row input {
-  background: #2F3136;
+.server-form-hint {
+  margin: 0;
+  color: #72767d;
+  font-size: 0.75rem;
 }
 
 /* 라디오 버튼 목록 (연결 대상, Exporter) — 관리자 체크박스 목록과 같은 상자 */

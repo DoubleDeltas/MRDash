@@ -14,17 +14,12 @@ const EXPORTERS = [
   },
 ]
 
-// 연결 대상: MRDash 백엔드의 Prometheus(PROMETHEUS_URL) 또는 Host/Port를 직접 입력한 외부 Prometheus.
-// MRDash로 저장하면 prometheusHost/Port가 null로 저장된다.
+// 연결 대상: MRDash 백엔드의 Prometheus(PROMETHEUS_URL) 또는 URL을 직접 입력한 외부 Prometheus.
+// MRDash로 저장하면 prometheusUrl/Token이 null로 저장된다.
 const TARGETS = [
   { value: 'MRDASH', label: 'MRDash Prometheus에 연결' },
   { value: 'EXTERNAL', label: '외부 Prometheus에 연결' },
 ]
-
-const MIN_PORT = 0
-const MAX_PORT = 65535
-// Prometheus 서버 기본 포트
-const DEFAULT_PORT = 9090
 
 // 서버별 Prometheus 데이터 소스 설정 — 처음 연결할 때와 연결된 설정을 고칠 때 같이 쓴다.
 function PrometheusSettings() {
@@ -38,8 +33,12 @@ function PrometheusSettings() {
   const [loadError, setLoadError] = useState(null)
 
   const [target, setTarget] = useState('MRDASH')
-  const [host, setHost] = useState('')
-  const [port, setPort] = useState(String(DEFAULT_PORT))
+  const [url, setUrl] = useState('')
+  // 저장된 토큰은 내려오지 않으므로, 입력칸은 새 토큰을 넣을 때만 쓰고 비워 두면 기존 토큰을 유지한다
+  const [token, setToken] = useState('')
+  const [clearToken, setClearToken] = useState(false)
+  const [job, setJob] = useState('')
+  const [instance, setInstance] = useState('')
   const [exporter, setExporter] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -50,21 +49,15 @@ function PrometheusSettings() {
       .then(res => {
         const s = res.data.data
         setServer(s)
-        setTarget(s.prometheusHost ? 'EXTERNAL' : 'MRDASH')
-        setHost(s.prometheusHost || '')
-        setPort(String(s.prometheusPort ?? DEFAULT_PORT))
+        setTarget(s.prometheusUrl ? 'EXTERNAL' : 'MRDASH')
+        setUrl(s.prometheusUrl || '')
+        setJob(s.prometheusJob || '')
+        setInstance(s.prometheusInstance || '')
         setExporter(s.prometheusExporter || null)
       })
       .catch(() => setLoadError('서버 정보를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [serverId])
-
-  // 직접 입력한 값은 포커스를 잃을 때 0~65535 범위의 정수로 맞춘다 (비우면 기본 포트)
-  const handlePortBlur = () => {
-    const parsed = parseInt(port, 10)
-    const clamped = Number.isNaN(parsed) ? DEFAULT_PORT : Math.min(MAX_PORT, Math.max(MIN_PORT, parsed))
-    setPort(String(clamped))
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -73,7 +66,6 @@ function PrometheusSettings() {
       return
     }
 
-    const parsedPort = parseInt(port, 10)
     setSubmitting(true)
     setError(null)
     try {
@@ -81,9 +73,12 @@ function PrometheusSettings() {
         dataSource: 'PROMETHEUS',
         target,
         ...(target === 'EXTERNAL' && {
-          host: host.trim(),
-          port: Number.isNaN(parsedPort) ? DEFAULT_PORT : Math.min(MAX_PORT, Math.max(MIN_PORT, parsedPort)),
+          url: url.trim(),
+          ...(token.trim() && { token: token.trim() }),
+          ...(clearToken && { clearToken: true }),
         }),
+        job: job.trim(),
+        instance: instance.trim() || null,
         exporter,
       })
       navigate(`/settings/${server.id}`)
@@ -142,34 +137,71 @@ function PrometheusSettings() {
             ))}
             {/* 외부 Prometheus가 목록의 마지막 항목이라 그 바로 아래, 같은 상자 안에 둔다 */}
             {target === 'EXTERNAL' && (
-              <div className="prometheus-address-row">
-                <div className="server-form-row prometheus-host">
-                  <label htmlFor="prometheus-host">Host</label>
+              <div className="prometheus-external-fields">
+                <div className="server-form-row">
+                  <label htmlFor="prometheus-url">URL</label>
                   <input
-                    id="prometheus-host"
-                    value={host}
-                    onChange={(e) => setHost(e.target.value)}
-                    placeholder="example.marendi.kr"
+                    id="prometheus-url"
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://prometheus.example.kr"
                     required
                   />
                 </div>
-                <div className="server-form-row prometheus-port">
-                  <label htmlFor="prometheus-port">Port</label>
-                  <input
-                    id="prometheus-port"
-                    type="number"
-                    min={MIN_PORT}
-                    max={MAX_PORT}
-                    step={1}
-                    value={port}
-                    onChange={(e) => setPort(e.target.value)}
-                    onBlur={handlePortBlur}
-                    required
-                  />
+                <div className="server-form-row">
+                  <label htmlFor="prometheus-token">인증 토큰 (선택)</label>
+                  <div className="prometheus-token-row">
+                    <input
+                      id="prometheus-token"
+                      type="password"
+                      autoComplete="off"
+                      value={token}
+                      onChange={(e) => { setToken(e.target.value); setClearToken(false) }}
+                      disabled={clearToken}
+                      placeholder={
+                        clearToken ? '저장하면 토큰이 삭제됩니다'
+                          : server.hasPrometheusToken ? '저장된 토큰 유지 (바꾸려면 새로 입력)'
+                            : 'Bearer 토큰'
+                      }
+                    />
+                    {server.hasPrometheusToken && (
+                      <button
+                        type="button"
+                        className="server-form-cancel"
+                        onClick={() => { setClearToken(prev => !prev); setToken('') }}
+                      >
+                        {clearToken ? '삭제 취소' : '토큰 삭제'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
           </div>
+        </div>
+
+        <div className="server-form-row">
+          <label htmlFor="prometheus-job">Job Name</label>
+          <input
+            id="prometheus-job"
+            value={job}
+            onChange={(e) => setJob(e.target.value)}
+            placeholder="minecraft"
+            required
+          />
+          <p className="server-form-hint">Prometheus 설정(scrape_configs)의 job_name</p>
+        </div>
+
+        <div className="server-form-row">
+          <label htmlFor="prometheus-instance">Targets (선택)</label>
+          <input
+            id="prometheus-instance"
+            value={instance}
+            onChange={(e) => setInstance(e.target.value)}
+            placeholder="mc-survival:9940"
+          />
+          <p className="server-form-hint">한 job에 서버가 여러 개라면 이 서버의 target(instance)을 입력</p>
         </div>
 
         <div className="server-form-row">

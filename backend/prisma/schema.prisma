@@ -61,8 +61,10 @@ model MinecraftServer {
   color                String?
   consoleToken         String?
   monitoringDataSource MonitoringDataSource?
-  prometheusHost       String?
-  prometheusPort       Int?
+  prometheusUrl        String?               @db.VarChar(512)
+  prometheusToken      String?               @db.Text
+  prometheusJob        String?
+  prometheusInstance   String?
   prometheusExporter   PrometheusExporter?
   mcVersion            String
   mcPlatform           MinecraftPlatform

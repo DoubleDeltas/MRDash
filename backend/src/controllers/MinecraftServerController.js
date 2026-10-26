@@ -4,12 +4,13 @@ import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
 import { isAgentConnected } from '../ws/consoleHub.js';
 
-// 응답에는 원본 image bytes/consoleToken 대신 보유 여부만 내려주고,
+// 응답에는 원본 image bytes/consoleToken/prometheusToken 대신 보유 여부만 내려주고,
 // managers 관계는 id 배열(managerIds)로 평탄화해서 내려준다
-const toPublicServer = ({ image, consoleToken, managers, ...server }) => ({
+const toPublicServer = ({ image, consoleToken, prometheusToken, managers, ...server }) => ({
   ...server,
   hasImage: image !== null,
   hasConsoleToken: consoleToken !== null,
+  hasPrometheusToken: prometheusToken != null,
   managerIds: (managers || []).map((m) => m.id),
 });
 
@@ -21,6 +22,15 @@ const decodeImageBase64 = (dataUrl) => {
 };
 
 const isValidHexColor = (color) => /^#[0-9A-Fa-f]{6}$/.test(color);
+
+const isValidHttpUrl = (value) => {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 // 전체 서버 목록 조회
 export const getAll = async (req, res) => {
@@ -140,26 +150,31 @@ export const issueConsoleToken = async (req, res) => {
 export const connectMonitoringDataSource = async (req, res) => {
   try {
     const { id } = req.params;
-    const { dataSource, target, host, port, exporter } = req.body;
+    const { dataSource, target, url, token, clearToken, job, instance, exporter } = req.body;
 
     if (!Object.values(MonitoringDataSource).includes(dataSource)) {
       return res.status(400).json({ success: false, error: `dataSource must be one of: ${Object.values(MonitoringDataSource).join(', ')}` });
     }
 
     // 지금은 Prometheus뿐이라 연결 정보도 Prometheus용 필드만 받는다.
-    // target이 MRDASH면 백엔드의 PROMETHEUS_URL을 쓰므로 host/port를 비워 저장하고(null = MRDash Prometheus),
-    // EXTERNAL이면 외부 Prometheus의 host/port를 받는다.
+    // target이 MRDASH면 백엔드의 PROMETHEUS_URL을 쓰므로 url/token을 비워 저장하고(url null = MRDash Prometheus),
+    // EXTERNAL이면 외부 Prometheus의 url과 (선택) 인증 토큰을 받는다.
     if (target !== 'MRDASH' && target !== 'EXTERNAL') {
       return res.status(400).json({ success: false, error: 'target must be one of: MRDASH, EXTERNAL' });
     }
-    const trimmedHost = typeof host === 'string' ? host.trim() : '';
-    if (target === 'EXTERNAL') {
-      if (!trimmedHost) {
-        return res.status(400).json({ success: false, error: 'host is required' });
-      }
-      if (!Number.isInteger(port) || port < 0 || port > 65535) {
-        return res.status(400).json({ success: false, error: 'port must be an integer between 0 and 65535' });
-      }
+    const trimmedUrl = typeof url === 'string' ? url.trim() : '';
+    if (target === 'EXTERNAL' && !isValidHttpUrl(trimmedUrl)) {
+      return res.status(400).json({ success: false, error: 'url must be a valid http(s) URL' });
+    }
+    if (token !== undefined && typeof token !== 'string') {
+      return res.status(400).json({ success: false, error: 'token must be a string' });
+    }
+    const trimmedJob = typeof job === 'string' ? job.trim() : '';
+    if (!trimmedJob) {
+      return res.status(400).json({ success: false, error: 'job is required' });
+    }
+    if (instance != null && typeof instance !== 'string') {
+      return res.status(400).json({ success: false, error: 'instance must be a string' });
     }
     if (!Object.values(PrometheusExporter).includes(exporter)) {
       return res.status(400).json({ success: false, error: `exporter must be one of: ${Object.values(PrometheusExporter).join(', ')}` });
@@ -169,8 +184,13 @@ export const connectMonitoringDataSource = async (req, res) => {
       where: { id: parseInt(id) },
       data: {
         monitoringDataSource: dataSource,
-        prometheusHost: target === 'EXTERNAL' ? trimmedHost : null,
-        prometheusPort: target === 'EXTERNAL' ? port : null,
+        prometheusUrl: target === 'EXTERNAL' ? trimmedUrl : null,
+        // 토큰은 응답으로 돌려주지 않으므로, 새 값을 보냈을 때만 바꾸고 안 보내면 기존 값을 유지한다
+        ...(target === 'MRDASH' || clearToken
+          ? { prometheusToken: null }
+          : token?.trim() && { prometheusToken: token.trim() }),
+        prometheusJob: trimmedJob,
+        prometheusInstance: instance?.trim() || null,
         prometheusExporter: exporter,
       },
       include: MANAGERS_INCLUDE,
@@ -194,8 +214,10 @@ export const disconnectMonitoringDataSource = async (req, res) => {
       where: { id: parseInt(id) },
       data: {
         monitoringDataSource: null,
-        prometheusHost: null,
-        prometheusPort: null,
+        prometheusUrl: null,
+        prometheusToken: null,
+        prometheusJob: null,
+        prometheusInstance: null,
         prometheusExporter: null,
       },
       include: MANAGERS_INCLUDE,
