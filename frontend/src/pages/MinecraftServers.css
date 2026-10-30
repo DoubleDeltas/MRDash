@@ -761,9 +761,12 @@
     text-align: left;
   }
 
+  /* 버튼이 카드 아래 한 줄로 내려오는 화면에서는 가로로 늘어놓는다 */
   .server-actions {
     grid-column: 1 / -1;
+    flex-direction: row;
     justify-content: flex-start;
+    min-height: 0;
     padding-top: 0.5rem;
   }
 }

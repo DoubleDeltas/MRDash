@@ -211,7 +211,8 @@
 /* 차트 그리드 */
 .monitoring-charts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+  /* 화면이 460px보다 좁으면 칸도 화면 폭까지 줄인다 (모바일에서 가로로 넘치지 않게) */
+  grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr));
   gap: 1.5rem;
 }
 
@@ -352,7 +353,7 @@
 
 /* 차트가 하나뿐인 섹션도 다른 섹션과 같은 칸 너비를 유지 (auto-fit은 한 개를 한 줄 전체로 늘린다) */
 .monitoring-charts-grid-fill {
-  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr));
 }
 
 /* 컨트롤 바 왼쪽: 보기 모드 + 기간 */
