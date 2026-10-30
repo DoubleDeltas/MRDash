@@ -91,5 +91,25 @@
     font-size: 1.5rem;
     margin-left: 0;
   }
+
+  /* 좁은 화면에서는 가장 말단 섹션 이름만 한 줄로 (길면 말줄임) */
+  .navbar-breadcrumbs {
+    min-width: 0;
+  }
+
+  .breadcrumb-item:not(:last-child) {
+    display: none;
+  }
+
+  .breadcrumb-item:last-child {
+    min-width: 0;
+  }
+
+  .breadcrumb-item:last-child .breadcrumb-current,
+  .breadcrumb-item:last-child .breadcrumb-link {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
