@@ -183,10 +183,17 @@ body {
 }
 
 @media (max-width: 768px) {
+  /* fixed 요소는 페이지 스크롤을 따라가지 않으므로, 화면 높이만큼 잡고 안에서 세로로 스와이프되게 한다 */
   .main-content {
     margin-left: 0;
     position: fixed;
     width: 100%;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .header {
