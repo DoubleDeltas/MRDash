@@ -9,6 +9,7 @@ GitHub 저장소: `https://github.com/DoubleDeltas/MRDash`
 Mrdash/
 ├── frontend/   # React + Vite SPA
 ├── backend/    # Node.js + Express + Prisma API 서버
+├── discord-bot/ # discord.js 봇 ("마랜디" 서버 멤버 → MRDash 자동 가입·인증)
 └── bridge/     # Java Swing 데스크톱 앱 (Minecraft 서버 ↔ 백엔드 브리지)
 ```
 
@@ -55,7 +56,8 @@ frontend:
 ### 환경변수 (backend)
 
 서버의 `.env` 파일로 주입 (`env_file: .env`). `.env.example` 참고.  
-주요 항목: `DATABASE_URL`, `SESSION_REDIS_URL`, `DISCORD_CLIENT_ID/SECRET/CALLBACK`, `FRONTEND_URL`, `SESSION_SECRET`, `PROMETHEUS_URL`(모니터링 화면용, 미설정·연결 실패 시 화면에 안내 카드 표시)
+로컬 개발도 저장소 루트의 `.env` 하나를 backend·discord-bot이 함께 읽는다 (`backend/src/config/env.js`, `discord-bot/src/env.js`). Prisma CLI는 `pnpm prisma:migrate` 등 `dotenv -e ../.env` 래핑 스크립트로 실행.  
+주요 항목: `DATABASE_URL`, `SESSION_REDIS_URL`, `DISCORD_CLIENT_ID/SECRET/CALLBACK`, `FRONTEND_URL`, `SESSION_SECRET`, `PROMETHEUS_URL`(모니터링 화면용, 미설정·연결 실패 시 화면에 안내 카드 표시), `INTERNAL_API_SECRET`(디스코드 봇 등 내부 서비스용 `/internal` API 시크릿, 미설정 시 내부 API 비활성)
 
 ### 서버 인프라
 
@@ -65,6 +67,17 @@ frontend:
 - DB: 외부 MySQL (`192.168.55.80`), 스키마 `mrd_prod`
 - Redis: 외부 Redis (`192.168.55.80`), logical DB 1
 - 컨테이너명: `mrdash-frontend`, `mrdash-backend` (공용 nginx가 이 이름으로 참조)
+
+---
+
+## Discord Bot
+
+`discord-bot/`은 Node.js(ESM) + discord.js 봇. 이미지 `ghcr.io/doubledeltas/mrd-discord-bot`, 컨테이너 `mrdash-discord-bot` (`mrd-net`에서 backend와 통신).
+
+- **멤버 인증**: "마랜디" 서버 멤버면 `User.isMrdAuthorized = true`(계정 없으면 생성), 나가면 `false`. 입장/퇴장 이벤트 즉시 반영 + 주기적 전체 동기화.
+- backend의 `/internal` API(`PUT /internal/members`, `PUT|DELETE /internal/members/:discordId`)를 `Authorization: Bearer <INTERNAL_API_SECRET>`으로 호출. `/internal`은 `/api` 밖이라 공용 nginx로 노출되지 않음.
+- 기능은 `src/modules/<이름>/`에 `{ name, register(client) }` 형태로 만들고 `src/index.js`의 `modules`에 추가.
+- 환경변수: backend와 같은 서버의 `.env` 하나를 공유 (`.env.example`의 discord-bot 항목 참고). `BACKEND_INTERNAL_URL`은 기본값이 운영(`NODE_ENV=production`)이면 `http://mrdash-backend:3000/internal`, 로컬이면 `http://localhost:$PORT/internal`이라 보통 생략. Developer Portal에서 **Server Members Intent** 활성화 필요.
 
 ---
 

@@ -7,9 +7,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
+    "prisma:generate": "dotenv -e ../.env -- prisma generate",
+    "prisma:migrate": "dotenv -e ../.env -- prisma migrate dev",
+    "prisma:studio": "dotenv -e ../.env -- prisma studio",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -37,6 +37,7 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
+    "dotenv-cli": "^8.0.0",
     "nodemon": "^3.0.1",
     "prisma": "^5.7.1"
   }

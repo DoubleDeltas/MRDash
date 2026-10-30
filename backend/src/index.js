@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './config/env.js';
 import http from 'node:http';
 import { prisma } from './config/prisma.js';
 import { sessionRedis } from './config/session-redis.js';

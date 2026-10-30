@@ -3,6 +3,7 @@ import cors from 'cors';
 import session from 'express-session';
 import { initializePassport } from './passport/index.js';
 import routes from './routes/index.js';
+import internalRoutes from './routes/internalRoutes.js';
 import { RedisStore } from 'connect-redis';
 import { sessionRedis } from './config/session-redis.js';
 
@@ -43,6 +44,7 @@ export const createApp = () => {
   
   // Routes
   app.use('/api', routes);
+  app.use('/internal', internalRoutes);
   
   // 헬스 체크
   app.get('/health', (req, res) => {
