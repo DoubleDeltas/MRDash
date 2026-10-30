@@ -26,6 +26,16 @@ services:
       - ddeltas-net
       - mrd-net
 
+  discord-bot:
+    image: ghcr.io/doubledeltas/mrd-discord-bot:latest
+    container_name: mrdash-discord-bot
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - backend
+    networks:
+      - mrd-net
+
   nginx:
     image: nginx:alpine
     restart: unless-stopped

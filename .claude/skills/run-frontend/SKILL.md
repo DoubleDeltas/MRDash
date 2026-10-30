@@ -19,7 +19,7 @@ timeout 30 bash -c 'until curl -sf http://localhost:3000/health >/dev/null; do s
 ```
 
 Requires the real MySQL (`DATABASE_URL`) and Redis (`SESSION_REDIS_URL`) in
-`backend/.env` to be reachable — check with
+the root `.env` to be reachable — check with
 `Test-NetConnection -ComputerName <host> -Port <port>` first. If they're not
 reachable, ask the user to turn them on; there's no local/mocked substitute
 configured for this project.
@@ -31,7 +31,7 @@ cd frontend && pnpm run dev &
 timeout 30 bash -c 'until curl -sf http://localhost:5173/ >/dev/null; do sleep 1; done'
 ```
 
-CORS is already configured backend-side (`FRONTEND_URL` in `backend/.env`,
+CORS is already configured backend-side (`FRONTEND_URL` in the root `.env`,
 `cors()` in `backend/src/app.js`) for `http://localhost:5173` with
 credentials, so cookie-based session auth works cross-port out of the box.
 
