@@ -50,6 +50,32 @@ export const syncAll = async (req, res) => {
   }
 };
 
+// 멤버 조회: 다른 내부 서비스(마랜디위키 등)가 디스코드 ID로 인증 여부를 확인한다.
+// 계정이 없으면 인증되지 않은 것으로 응답한다.
+export const getMember = async (req, res) => {
+  try {
+    const { discordId } = req.params;
+    if (!/^\d+$/.test(discordId)) {
+      return res.status(400).json({ success: false, error: 'invalid discordId' });
+    }
+    const user = await prisma.user.findUnique({
+      where: { provider_user_unique: { provider: 'DISCORD', providerId: discordId } },
+      select: { isMrdAuthorized: true, handle: true, nickname: true },
+    });
+    res.json({
+      success: true,
+      data: {
+        discordId,
+        isMrdAuthorized: user?.isMrdAuthorized ?? false,
+        handle: user?.handle ?? null,
+        nickname: user?.nickname ?? null,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // 멤버 입장 (또는 프로필 변경)
 export const upsertMember = async (req, res) => {
   try {

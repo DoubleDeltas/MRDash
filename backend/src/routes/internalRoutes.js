@@ -1,5 +1,5 @@
 import express from 'express';
-import { syncAll, upsertMember, removeMember } from '../controllers/MemberSyncController.js';
+import { syncAll, getMember, upsertMember, removeMember } from '../controllers/MemberSyncController.js';
 import { requireInternalSecret } from '../middleware/requireInternalSecret.js';
 
 // 내부 서비스 전용 라우트. /api 밖(/internal)에 마운트되므로
@@ -9,6 +9,7 @@ const router = express.Router();
 router.use(requireInternalSecret);
 
 router.put('/members', syncAll);
+router.get('/members/:discordId', getMember);
 router.put('/members/:discordId', upsertMember);
 router.delete('/members/:discordId', removeMember);
 

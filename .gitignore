@@ -14,6 +14,7 @@ bridge/target/
 bridge/build/
 bridge/.gradle/
 bridge/*.dat
+mrd-bridge.dat
 bridge/*.exe
 bridge/dependency-reduced-pom.xml
 
