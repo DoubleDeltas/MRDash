@@ -36,6 +36,21 @@ services:
     networks:
       - mrd-net
 
+  # Minecraft 서버(DOCKER 타입) ↔ backend 브리지.
+  # mrd-bridge.dat은 GUI/CLI로 미리 만들어 이 파일 옆에 둔다 (없으면 Docker가 디렉터리로 만들어 버리니 주의).
+  # 같은 네트워크라 .dat의 backend.wsUrl을 ws://mrdash-backend:3000 으로 두면 공용 nginx를 거치지 않는다.
+  bridge:
+    image: ghcr.io/doubledeltas/mrd-bridge:latest
+    container_name: mrdash-bridge
+    restart: unless-stopped
+    volumes:
+      - ./mrd-bridge.dat:/app/mrd-bridge.dat:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - backend
+    networks:
+      - mrd-net
+
   nginx:
     image: nginx:alpine
     restart: unless-stopped

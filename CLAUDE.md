@@ -57,7 +57,7 @@ frontend:
 
 서버의 `.env` 파일로 주입 (`env_file: .env`). `.env.example` 참고.  
 로컬 개발도 저장소 루트의 `.env` 하나를 backend·discord-bot이 함께 읽는다 (`backend/src/config/env.js`, `discord-bot/src/env.js`). Prisma CLI는 `pnpm prisma:migrate` 등 `dotenv -e ../.env` 래핑 스크립트로 실행.  
-주요 항목: `DATABASE_URL`, `SESSION_REDIS_URL`, `DISCORD_CLIENT_ID/SECRET/CALLBACK`, `FRONTEND_URL`, `SESSION_SECRET`, `PROMETHEUS_URL`(모니터링 화면용, 미설정·연결 실패 시 화면에 안내 카드 표시), `INTERNAL_API_SECRET`(디스코드 봇 등 내부 서비스용 `/internal` API 시크릿, 미설정 시 내부 API 비활성)
+주요 항목: `DATABASE_URL`, `SESSION_REDIS_URL`, `DISCORD_CLIENT_ID/SECRET/CALLBACK`, `FRONTEND_URL`, `SESSION_SECRET`, `PROMETHEUS_URL`(모니터링 화면용, 미설정·연결 실패 시 화면에 안내 카드 표시), `INTERNAL_API_SECRET`(`/internal` API 전체 권한 시크릿, 디스코드 봇용), `READONLY_API_SECRET`(`/internal` API 조회(GET) 전용 시크릿, 마랜디위키 등 다른 서비스용). 둘 다 미설정 시 내부 API 비활성
 
 ### 서버 인프라
 
@@ -75,7 +75,8 @@ frontend:
 `discord-bot/`은 Node.js(ESM) + discord.js 봇. 이미지 `ghcr.io/doubledeltas/mrd-discord-bot`, 컨테이너 `mrdash-discord-bot` (`mrd-net`에서 backend와 통신).
 
 - **멤버 인증**: "마랜디" 서버 멤버면 `User.isMrdAuthorized = true`(계정 없으면 생성), 나가면 `false`. 입장/퇴장 이벤트 즉시 반영 + 주기적 전체 동기화.
-- backend의 `/internal` API(`PUT /internal/members`, `PUT|DELETE /internal/members/:discordId`)를 `Authorization: Bearer <INTERNAL_API_SECRET>`으로 호출. `/internal`은 `/api` 밖이라 공용 nginx로 노출되지 않음.
+- backend의 `/internal` API(`PUT /internal/members`, `GET|PUT|DELETE /internal/members/:discordId`)를 `Authorization: Bearer <INTERNAL_API_SECRET>`으로 호출. `/internal`은 `/api` 밖이라 공용 nginx로 노출되지 않음.
+- 마랜디위키는 `READONLY_API_SECRET`으로 `GET /internal/members/:discordId`(인증 여부 조회)만 호출한다 (`ddeltas-net`에서 `mrdash-backend:3000`에 직접 접근). 읽기 전용 시크릿으로 쓰기 요청 시 403.
 - 기능은 `src/modules/<이름>/`에 `{ name, register(client) }` 형태로 만들고 `src/index.js`의 `modules`에 추가.
 - 환경변수: backend와 같은 서버의 `.env` 하나를 공유 (`.env.example`의 discord-bot 항목 참고). `BACKEND_INTERNAL_URL`은 기본값이 운영(`NODE_ENV=production`)이면 `http://mrdash-backend:3000/internal`, 로컬이면 `http://localhost:$PORT/internal`이라 보통 생략. Developer Portal에서 **Server Members Intent** 활성화 필요.
 
@@ -135,29 +136,20 @@ mrd-bridge server add docker mc-server-2 <api-key-2>
 mrd-bridge server list   # 확인
 ```
 
-#### 2. 이미지 빌드 및 실행
+#### 2. 실행
+
+`docker-compose.yml`에 `bridge` 서비스(이미지 `ghcr.io/doubledeltas/mrd-bridge`, 컨테이너 `mrdash-bridge`)로 포함돼 있다.  
+`mrd-bridge.dat`을 `docker-compose.yml` 옆에 두고 `docker compose up -d` — **파일이 없으면 Docker가 같은 이름의 디렉터리를 만들어 버리므로** 먼저 준비할 것.  
+`mrd-net`에 붙어 있으므로 `.dat`의 `backend.wsUrl`을 `ws://mrdash-backend:3000`으로 두면 공용 nginx를 거치지 않는다 (기본값 `wss://dash.ddeltas.kro.kr`도 동작).
+
+compose 없이 단독 실행할 경우:
 
 ```bash
-# bridge/ 디렉터리에서 이미지 빌드
-docker build -t mrd-bridge ./bridge
-
-# 실행 (.dat 마운트 + Docker 소켓 마운트)
 docker run -d \
   -v /host/path/mrd-bridge.dat:/app/mrd-bridge.dat:ro \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --restart unless-stopped \
-  mrd-bridge
-```
-
-`docker-compose.yml`에 추가할 경우:
-
-```yaml
-mrd-bridge:
-  build: ./bridge
-  volumes:
-    - ./mrd-bridge.dat:/app/mrd-bridge.dat:ro
-    - /var/run/docker.sock:/var/run/docker.sock
-  restart: unless-stopped
+  ghcr.io/doubledeltas/mrd-bridge:latest
 ```
 
 `.dat`의 모든 enabled 서버에 동시 연결한다. 서버를 추가/변경하려면 `.dat`을 수정 후 컨테이너를 재시작.
