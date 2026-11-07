@@ -57,7 +57,7 @@ frontend:
 
 서버의 `.env` 파일로 주입 (`env_file: .env`). `.env.example` 참고.  
 로컬 개발도 저장소 루트의 `.env` 하나를 backend·discord-bot이 함께 읽는다 (`backend/src/config/env.js`, `discord-bot/src/env.js`). Prisma CLI는 `pnpm prisma:migrate` 등 `dotenv -e ../.env` 래핑 스크립트로 실행.  
-주요 항목: `DATABASE_URL`, `SESSION_REDIS_URL`, `DISCORD_CLIENT_ID/SECRET/CALLBACK`, `FRONTEND_URL`, `SESSION_SECRET`, `PROMETHEUS_URL`(모니터링 화면용, 미설정·연결 실패 시 화면에 안내 카드 표시), `INTERNAL_API_SECRET`(`/internal` API 전체 권한 시크릿, 디스코드 봇용), `READONLY_API_SECRET`(`/internal` API 조회(GET) 전용 시크릿, 마랜디위키 등 다른 서비스용). 둘 다 미설정 시 내부 API 비활성
+주요 항목: `DATABASE_URL`, `SESSION_REDIS_URL`, `DISCORD_CLIENT_ID/SECRET/CALLBACK`, `FRONTEND_URL`, `SESSION_SECRET`, `PROMETHEUS_URL`(모니터링 화면용, 미설정·연결 실패 시 화면에 안내 카드 표시), `GRAFANA_URL`(모니터링 그래프 엔진, 기본 `http://grafana:3000` — `/api/grafana/*`를 MRDash 로그인 확인 후 프록시, 설정은 `grafana/README.md`), `GRAFANA_SERVICE_ACCOUNT_TOKEN`(외부 Prometheus 서버마다 Grafana 데이터 소스 `mrdash-server-<id>`를 자동 관리하는 Admin 서비스 계정 토큰), `INTERNAL_API_SECRET`(`/internal` API 전체 권한 시크릿, 디스코드 봇용), `READONLY_API_SECRET`(`/internal` API 조회(GET) 전용 시크릿, 마랜디위키 등 다른 서비스용). 둘 다 미설정 시 내부 API 비활성
 
 ### 서버 인프라
 
