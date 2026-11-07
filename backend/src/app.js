@@ -6,6 +6,7 @@ import routes from './routes/index.js';
 import internalRoutes from './routes/internalRoutes.js';
 import { RedisStore } from 'connect-redis';
 import { sessionRedis } from './config/session-redis.js';
+import { GRAFANA_PATH, grafanaProxy } from './middleware/grafanaProxy.js';
 
 export const createApp = () => {
   const app = express();
@@ -22,10 +23,6 @@ export const createApp = () => {
     origin: process.env.FRONTEND_URL,
     credentials: true,
   }));
-  // base64로 인코딩된 서버 이미지(128x128 PNG)를 받을 수 있도록 기본 100kb보다 넉넉하게 잡음
-  app.use(express.json({ limit: '1mb' }));
-  app.use(express.urlencoded({ extended: true }));
-  
   app.use(session({
     store: new RedisStore({
       client: sessionRedis
@@ -41,7 +38,15 @@ export const createApp = () => {
   }));
   
   initializePassport(app);
-  
+
+  // Grafana 프록시는 요청 본문을 그대로 넘겨야 하므로 본문 파서(express.json)보다 먼저 둔다.
+  // 세션·passport는 본문을 읽지 않으므로 그 뒤에 둬도 로그인 확인은 된다.
+  app.use(GRAFANA_PATH, grafanaProxy);
+
+  // base64로 인코딩된 서버 이미지(128x128 PNG)를 받을 수 있도록 기본 100kb보다 넉넉하게 잡음
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true }));
+
   // Routes
   app.use('/api', routes);
   app.use('/internal', internalRoutes);

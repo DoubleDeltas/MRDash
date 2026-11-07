@@ -3,6 +3,7 @@ import { MinecraftPlatform, MonitoringDataSource, PrometheusExporter } from '@pr
 import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
 import { EXPORTER_METRICS } from '../util/exporterMetrics.js';
+import { syncServerDatasource } from '../util/grafanaDatasources.js';
 import { PrometheusHttpError, buildSelector, queryInstant } from '../util/prometheus.js';
 import { isAgentConnected } from '../ws/consoleHub.js';
 
@@ -213,6 +214,8 @@ export const connectMonitoringDataSource = async (req, res) => {
       },
       include: MANAGERS_INCLUDE,
     });
+    // 외부 Prometheus면 Grafana 데이터 소스를 만들거나 고치고, MRDash Prometheus로 바꿨으면 지운다
+    await syncServerDatasource(server.id);
 
     res.json({ success: true, data: toPublicServer(server) });
   } catch (error) {
@@ -311,6 +314,7 @@ export const disconnectMonitoringDataSource = async (req, res) => {
       },
       include: MANAGERS_INCLUDE,
     });
+    await syncServerDatasource(server.id);
 
     res.json({ success: true, data: toPublicServer(server) });
   } catch (error) {
@@ -432,6 +436,7 @@ export const deleteServer = async (req, res) => {
     await prisma.minecraftServer.delete({
       where: { id: parseInt(id) },
     });
+    await syncServerDatasource(server.id);
 
     res.json({ success: true, message: 'Server deleted' });
   } catch (error) {

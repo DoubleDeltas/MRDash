@@ -1,209 +1,21 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { WS_BASE_URL } from '../api/client'
-import LineChart from '../components/LineChart'
-import { maxScale, formatTick } from '../components/chartScale'
+import GrafanaPanel from '../components/GrafanaPanel'
+import { GRAFANA_DASHBOARDS, grafanaPanelUrl } from '../components/grafana'
 import MonitoringRangeSelect, { DEFAULT_RANGE_MINUTES, formatStep } from '../components/MonitoringRangeSelect'
 import './Monitoring.css'
 
-// 다크 테마 categorical 팔레트 (dataviz/palette.md) — 컨테이너 이름순으로 배정
-const CONTAINER_PALETTE = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#1baf7a', '#e34948']
-
-// 백엔드 /ws/monitoring 스트림의 point에 화면용 시간 라벨과 컨테이너 색을 붙인다.
-function decoratePoints(points) {
-  const names = [...new Set(points.flatMap(p => p.containers.map(c => c.name)))].sort()
-  const colorOf = Object.fromEntries(names.map((name, i) => [name, CONTAINER_PALETTE[i % CONTAINER_PALETTE.length]]))
-  const containers = names.map(name => ({ id: name, name, color: colorOf[name] }))
-
-  const data = points.map(p => ({
-    ...p,
-    time: new Date(p.timestamp).toTimeString().slice(0, 5),
-    containers: p.containers.map(c => ({ ...c, id: c.name, color: colorOf[c.name] })),
-  }))
-  return { data, containers }
-}
-
-// 누적 막대 그래프 (Docker 컨테이너별 뷰용)
-function StackedBarChart({ data, containers, metric, unit, maxVal, title }) {
-  const svgRef = useRef(null)
-  const [hoverIdx, setHoverIdx] = useState(null)
-
-  const width = 560
-  const height = 240
-  const padLeft = 46
-  const padRight = 16
-  const padTop = 20
-  const padBottom = 32
-
-  const plotW = width - padLeft - padRight
-  const plotH = height - padTop - padBottom
-
-  // 막대 너비 및 간격
-  const barCount = data.length
-  const step = plotW / barCount
-  const barWidth = Math.min(24, Math.max(4, step - 4))
-
-  const yTicks = [0, 0.25, 0.5, 0.75, 1.0].map(ratio => ({
-    ratio,
-    val: formatTick(maxVal * ratio, maxVal),
-    y: padTop + plotH - ratio * plotH,
-  }))
-
-  const handlePointerMove = (e) => {
-    const rect = svgRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const mouseX = ((e.clientX - rect.left) / rect.width) * width
-    if (mouseX < padLeft || mouseX > width - padRight) {
-      setHoverIdx(null)
-      return
-    }
-    const idx = Math.floor((mouseX - padLeft) / step)
-    if (idx >= 0 && idx < barCount) {
-      setHoverIdx(idx)
-    } else {
-      setHoverIdx(null)
-    }
-  }
-
-  const activeData = hoverIdx !== null ? data[hoverIdx] : null
-
-  return (
-    <div className="monitoring-chart-card">
-      <div className="chart-header">
-        <h3 className="chart-title">{title}</h3>
-        {activeData && (
-          <div className="chart-active-stat">
-            <span className="stat-time">{activeData.time}</span>
-            <span className="stat-val">
-              합계 {metric === 'cpu' ? activeData.totalCpu : activeData.totalMemory} {unit}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="chart-svg-container">
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${width} ${height}`}
-          className="monitoring-svg"
-          onPointerMove={handlePointerMove}
-          onPointerLeave={() => setHoverIdx(null)}
-        >
-          {/* Y축 그리드선 및 라벨 */}
-          {yTicks.map(t => (
-            <g key={t.ratio}>
-              <line
-                x1={padLeft}
-                y1={t.y}
-                x2={width - padRight}
-                y2={t.y}
-                stroke="#383835"
-                strokeWidth="1"
-              />
-              <text
-                x={padLeft - 8}
-                y={t.y + 4}
-                textAnchor="end"
-                className="chart-axis-text"
-              >
-                {t.val}{unit === '%' ? '%' : ''}
-              </text>
-            </g>
-          ))}
-
-          {/* 누적 막대 렌더링 */}
-          {data.map((d, colIdx) => {
-            const barX = padLeft + colIdx * step + (step - barWidth) / 2
-            let currentStackH = 0
-            const isHovered = hoverIdx === colIdx
-
-            return (
-              <g key={colIdx} className={isHovered ? 'bar-group-active' : ''}>
-                {/* 배경 호버 하이라이트 */}
-                {isHovered && (
-                  <rect
-                    x={padLeft + colIdx * step}
-                    y={padTop}
-                    width={step}
-                    height={plotH}
-                    fill="rgba(255, 255, 255, 0.05)"
-                  />
-                )}
-
-                {/* 각 컨테이너별 세그먼트 (누적) */}
-                {d.containers.map((c, sIdx) => {
-                  const val = c[metric]
-                  const segH = (val / maxVal) * plotH
-                  if (segH <= 0.5) return null
-
-                  const y = padTop + plotH - currentStackH - segH
-                  currentStackH += segH
-
-                  // 표면 간격 (2px gap between stacked fills)
-                  const gap = sIdx > 0 ? 1 : 0
-                  const adjustedY = y + gap
-                  const adjustedH = Math.max(1, segH - gap)
-
-                  // 맨 위 세그먼트에는 3px 둥근 모서리 적용
-                  const isTop = sIdx === d.containers.length - 1
-
-                  return (
-                    <rect
-                      key={c.id}
-                      x={barX}
-                      y={adjustedY}
-                      width={barWidth}
-                      height={adjustedH}
-                      fill={c.color}
-                      rx={isTop ? 3 : 0}
-                      ry={isTop ? 3 : 0}
-                    />
-                  )
-                })}
-
-                {/* X축 시간 라벨 */}
-                {(colIdx % Math.ceil(barCount / 5) === 0 || colIdx === barCount - 1) && (
-                  <text
-                    x={barX + barWidth / 2}
-                    y={height - 10}
-                    textAnchor="middle"
-                    className="chart-axis-text"
-                  >
-                    {d.time}
-                  </text>
-                )}
-              </g>
-            )
-          })}
-        </svg>
-      </div>
-
-      {/* 컨테이너별 상세 호버 툴팁 */}
-      {activeData && (
-        <div className="stacked-tooltip">
-          <div className="tooltip-header">
-            <strong>{activeData.time}</strong>
-            <span>총 {metric === 'cpu' ? activeData.totalCpu : activeData.totalMemory} {unit}</span>
-          </div>
-          <div className="tooltip-items">
-            {activeData.containers.map(c => (
-              <div key={c.id} className="tooltip-item">
-                <span className="tooltip-color-dot" style={{ backgroundColor: c.color }} />
-                <span className="tooltip-name">{c.name}:</span>
-                <span className="tooltip-val">{c[metric]} {unit}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+// 백엔드 /ws/monitoring 스트림의 point에 화면용 시간 라벨을 붙인다 (KPI 타일용)
+const decoratePoints = (points) => points.map(p => ({
+  ...p,
+  time: new Date(p.timestamp).toTimeString().slice(0, 5),
+}))
 
 function Monitoring() {
   const [viewMode, setViewMode] = useState('total') // 'total' | 'container'
   // 'connecting': 백엔드 ws 연결 중 / 'ok': 데이터 수신 중 / 'unavailable': 백엔드가 Prometheus 조회에 실패
   const [status, setStatus] = useState('connecting')
-  const [metrics, setMetrics] = useState({ data: [], containers: [], memTotal: 0 })
+  const [metrics, setMetrics] = useState({ data: [], memTotal: 0 })
   const [rangeMinutes, setRangeMinutes] = useState(DEFAULT_RANGE_MINUTES)
   // 백엔드가 기간에 맞춰 정한 조회 간격(초) — 기간이 길수록 길어진다
   const [stepSec, setStepSec] = useState(null)
@@ -228,7 +40,7 @@ function Monitoring() {
         }
 
         if (msg.type === 'metrics') {
-          setMetrics({ ...decoratePoints(msg.points), memTotal: msg.memTotal })
+          setMetrics({ data: decoratePoints(msg.points), memTotal: msg.memTotal })
           setStepSec(msg.stepSec)
           setStatus('ok')
         } else if (msg.type === 'unavailable') {
@@ -254,7 +66,7 @@ function Monitoring() {
     }
   }, [rangeMinutes])
 
-  const { data, containers, memTotal } = metrics
+  const { data, memTotal } = metrics
   const currentPoint = data[data.length - 1] || {}
   const memRatio = memTotal ? (currentPoint.totalMemory || 0) / memTotal : 0
 
@@ -359,63 +171,19 @@ function Monitoring() {
         </div>
       </div>
 
-      {/* 차트 그리드 (CPU 부하 & 사용 중인 메모리) */}
+      {/* 그래프 — Grafana mrdash-host 대시보드의 패널 (grafana/dashboards/mrdash-host.json) */}
       <div className="monitoring-charts-grid">
-        {viewMode === 'total' ? (
-          <>
-            <LineChart
-              data={data}
-              dataKey="totalCpu"
-              unit="%"
-              maxVal={maxScale(data.map(d => d.totalCpu), { cap: 100 })}
-              title="CPU 부하 (전체 %)"
-              color="#3987e5"
-            />
-            <LineChart
-              data={data}
-              dataKey="totalMemory"
-              unit="GB"
-              maxVal={memTotal}
-              title="사용 중인 메모리 (전체 GB)"
-              color="#199e70"
-            />
-          </>
-        ) : (
-          <>
-            <StackedBarChart
-              data={data}
-              containers={containers}
-              metric="cpu"
-              unit="%"
-              maxVal={maxScale(data.map(d => d.containers.reduce((sum, c) => sum + c.cpu, 0)), { cap: 100 })}
-              title="CPU 부하 (컨테이너별 누적 %)"
-            />
-            <StackedBarChart
-              data={data}
-              containers={containers}
-              metric="memory"
-              unit="GB"
-              maxVal={memTotal}
-              title="사용 중인 메모리 (컨테이너별 누적 GB)"
-            />
-          </>
-        )}
+        {(viewMode === 'total'
+          ? [['cpu', 'CPU 부하 (전체)'], ['memory', '사용 중인 메모리 (전체)']]
+          : [['containerCpu', 'CPU 부하 (컨테이너별 누적)'], ['containerMemory', '사용 중인 메모리 (컨테이너별 누적)']]
+        ).map(([panel, title]) => (
+          <GrafanaPanel
+            key={panel}
+            title={title}
+            src={grafanaPanelUrl(GRAFANA_DASHBOARDS.host, GRAFANA_DASHBOARDS.host.panels[panel], { rangeMinutes })}
+          />
+        ))}
       </div>
-
-      {/* 컨테이너별 범례 (Docker 컨테이너별 모드 시 표시) */}
-      {viewMode === 'container' && (
-        <div className="container-legend-card">
-          <span className="legend-title">컨테이너 범례:</span>
-          <div className="legend-items">
-            {containers.map(c => (
-              <div key={c.id} className="legend-item">
-                <span className="legend-color-box" style={{ backgroundColor: c.color }} />
-                <span className="legend-name">{c.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

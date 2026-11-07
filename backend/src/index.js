@@ -4,6 +4,7 @@ import { prisma } from './config/prisma.js';
 import { sessionRedis } from './config/session-redis.js';
 import { createApp } from './app.js';
 import { attachConsoleHub } from './ws/consoleHub.js';
+import { startDatasourceResync } from './util/grafanaDatasources.js';
 
 const PORT = process.env.PORT;
 
@@ -23,6 +24,9 @@ const startServer = async () => {
     server.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);
     });
+
+    // 외부 Prometheus 서버들의 Grafana 데이터 소스를 맞추고, 이후에도 주기적으로 다시 맞춘다
+    startDatasourceResync();
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
