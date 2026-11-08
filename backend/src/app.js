@@ -7,6 +7,7 @@ import internalRoutes from './routes/internalRoutes.js';
 import { RedisStore } from 'connect-redis';
 import { sessionRedis } from './config/session-redis.js';
 import { GRAFANA_PATH, grafanaProxy } from './middleware/grafanaProxy.js';
+import grafanaWebhookRoutes from './routes/grafanaWebhookRoutes.js';
 
 export const createApp = () => {
   const app = express();
@@ -49,6 +50,8 @@ export const createApp = () => {
 
   // Routes
   app.use('/api', routes);
+  // Grafana 경보 webhook은 자체 시크릿(GRAFANA_ALERT_WEBHOOK_SECRET)을 쓰므로 /internal 공통 인증보다 먼저 둔다
+  app.use('/internal/grafana', grafanaWebhookRoutes);
   app.use('/internal', internalRoutes);
   
   // 헬스 체크

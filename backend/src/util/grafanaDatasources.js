@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { grafanaApi, isGrafanaApiConfigured } from './grafanaApi.js';
 
 // 외부 Prometheus를 쓰는 서버마다 Grafana에 Prometheus 데이터 소스를 하나씩 만들어 둔다.
 // 서버 모니터링 페이지는 대시보드 주소에 var-datasource=<uid>를 붙여 그 데이터 소스로 그린다.
@@ -6,28 +7,11 @@ import { prisma } from '../config/prisma.js';
 //
 // Grafana API는 GRAFANA_SERVICE_ACCOUNT_TOKEN(Admin 역할 서비스 계정)으로 호출한다 — grafana/README.md
 const UID_PREFIX = 'mrdash-server-';
-const REQUEST_TIMEOUT_MS = 5000;
-const RESYNC_INTERVAL_MS = 10 * 60 * 1000;
 
 // 이름도 uid와 같게 둔다 — 대시보드 datasource 변수는 버전에 따라 주소의 값을 이름으로도 uid로도 읽는다
 export const serverDatasourceUid = (serverId) => `${UID_PREFIX}${serverId}`;
 
-const isConfigured = () => Boolean(process.env.GRAFANA_SERVICE_ACCOUNT_TOKEN);
-
-const grafanaApi = async (method, path, body) => {
-  const res = await fetch(`${(process.env.GRAFANA_URL || 'http://grafana:3000').replace(/\/+$/, '')}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${process.env.GRAFANA_SERVICE_ACCOUNT_TOKEN}`,
-      ...(body && { 'Content-Type': 'application/json' }),
-    },
-    body: body && JSON.stringify(body),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Grafana ${method} ${path} → HTTP ${res.status}: ${await res.text()}`);
-  return res.status === 204 ? {} : res.json();
-};
+const isConfigured = isGrafanaApiConfigured;
 
 // source: { serverId, url, token } — PrometheusDataSource의 외부 Prometheus 설정
 const datasourceFor = ({ serverId, url, token }) => {
@@ -105,13 +89,4 @@ export const syncAllServerDatasources = async () => {
   } catch (error) {
     console.error('[grafana] datasource resync failed:', error.message);
   }
-};
-
-export const startDatasourceResync = () => {
-  if (!isConfigured()) {
-    console.log('ℹ️ GRAFANA_SERVICE_ACCOUNT_TOKEN not set — external Prometheus datasources are not synced to Grafana');
-    return;
-  }
-  syncAllServerDatasources();
-  setInterval(syncAllServerDatasources, RESYNC_INTERVAL_MS);
 };

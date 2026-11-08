@@ -2,6 +2,7 @@ import { MonitoringAlertOp } from '@prisma/client';
 import { prisma } from '../config/prisma.js';
 import { alertMetricsFor } from '../util/exporterMetrics.js';
 import { getStoredChannels } from './DiscordChannelController.js';
+import { syncGrafanaAlerts } from '../util/grafanaAlerts.js';
 
 // 서버별 모니터링 알림 설정 (/settings/alert/:serverId 화면).
 // 규칙·채널·웹후크는 저장할 때마다 통째로 바꾼다.
@@ -113,6 +114,9 @@ export const saveMonitoringAlert = async (req, res) => {
         await tx.monitoringAlert.create({ data: { serverId, ...children } });
       }
     });
+
+    // Grafana 경보 규칙·알림 대상에 반영 (실패해도 저장은 유지, 주기적 재동기화가 다시 맞춘다)
+    await syncGrafanaAlerts();
 
     res.json({ success: true, data: toResponse(await loadAlert(serverId)) });
   } catch (error) {
