@@ -19,20 +19,15 @@ export const GRAFANA_DASHBOARDS = {
 // 외부 Prometheus를 쓰는 서버의 Grafana 데이터 소스 — backend/src/util/grafanaDatasources.js와 같은 규칙
 export const serverDatasourceUid = (serverId) => `mrdash-server-${serverId}`
 
-// 기간에 맞춘 자동 새로고침 — 백엔드의 조회 간격과 같은 규칙 (15초 단위, 1분 이하)
-const refreshFor = (rangeMinutes) => {
-  const sec = Math.min(60, Math.max(15, Math.ceil((rangeMinutes * 60) / 60 / 15) * 15))
-  return sec % 60 === 0 ? `${sec / 60}m` : `${sec}s`
-}
-
 // 패널 하나만 보여주는 Grafana 주소 (/d-solo/<uid>/<slug>?panelId=...)
-export const grafanaPanelUrl = (dashboard, panelId, { rangeMinutes, vars = {} }) => {
+// range: MonitoringRangeSelect의 resolveRange 결과 { from, to, refresh }
+export const grafanaPanelUrl = (dashboard, panelId, { range, vars = {} }) => {
   const params = new URLSearchParams({
     orgId: '1',
     panelId: String(panelId),
-    from: `now-${rangeMinutes}m`,
-    to: 'now',
-    refresh: refreshFor(rangeMinutes),
+    from: range.from,
+    to: range.to,
+    refresh: range.refresh,
     theme: 'dark',
   })
   for (const [name, value] of Object.entries(vars)) {
