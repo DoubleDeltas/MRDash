@@ -1,5 +1,6 @@
 import express from 'express';
 import { syncAll, getMember, upsertMember, removeMember } from '../controllers/MemberSyncController.js';
+import { replaceChannels } from '../controllers/DiscordChannelController.js';
 import { requireInternalSecret } from '../middleware/requireInternalSecret.js';
 
 // 내부 서비스 전용 라우트. /api 밖(/internal)에 마운트되므로
@@ -12,5 +13,8 @@ router.put('/members', syncAll);
 router.get('/members/:discordId', getMember);
 router.put('/members/:discordId', upsertMember);
 router.delete('/members/:discordId', removeMember);
+
+// "테트라" 봇이 볼 수 있는 채널 목록 (모니터링 알림 대상 선택용)
+router.put('/discord-channels', replaceChannels);
 
 export default router;

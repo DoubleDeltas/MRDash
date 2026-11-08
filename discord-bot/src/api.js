@@ -23,4 +23,5 @@ export const api = {
   syncMembers: (members) => request('PUT', '/members', { members }),
   upsertMember: (member) => request('PUT', `/members/${member.id}`, member),
   removeMember: (discordId) => request('DELETE', `/members/${discordId}`),
+  replaceChannels: (channels) => request('PUT', '/discord-channels', { channels }),
 };

@@ -10,7 +10,7 @@ import { isAgentConnected } from '../ws/consoleHub.js';
 // 응답에는 원본 image bytes/consoleToken/Prometheus 토큰 대신 보유 여부만 내려주고,
 // managers 관계는 id 배열(managerIds)로 평탄화해서 내려준다.
 // 모니터링 데이터 소스(MonitoringDataSource → PrometheusDataSource)도 테이블을 나누기 전의 응답 모양 그대로 평탄화한다.
-const toPublicServer = ({ image, consoleToken, managers, monitoringDataSource, ...server }) => {
+const toPublicServer = ({ image, consoleToken, managers, monitoringDataSource, monitoringAlert, ...server }) => {
   const prometheus = monitoringDataSource?.prometheus;
   return {
     ...server,
@@ -23,6 +23,8 @@ const toPublicServer = ({ image, consoleToken, managers, monitoringDataSource, .
     prometheusInstance: prometheus?.instance ?? null,
     prometheusExporter: prometheus?.exporter ?? null,
     hasPrometheusToken: prometheus?.token != null,
+    // 서버 설정의 "모니터링 알림 설정" 문구용 개수 — 알림 설정이 없으면 null
+    alertSummary: monitoringAlert?._count ?? null,
   };
 };
 
@@ -30,6 +32,7 @@ const toPublicServer = ({ image, consoleToken, managers, monitoringDataSource, .
 const SERVER_INCLUDE = {
   managers: { select: { id: true } },
   monitoringDataSource: { include: { prometheus: true } },
+  monitoringAlert: { select: { _count: { select: { rules: true, channels: true, webhooks: true } } } },
 };
 
 const decodeImageBase64 = (dataUrl) => {
