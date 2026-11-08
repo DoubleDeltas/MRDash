@@ -110,6 +110,7 @@ function ServerMonitoring() {
           {panel('tps', 'TPS')}
           {panel('entities', '엔티티 수')}
           {panel('chunks', '로드된 청크 수')}
+          {panel('heap', '힙 메모리')}
         </div>
       </section>
     </div>
