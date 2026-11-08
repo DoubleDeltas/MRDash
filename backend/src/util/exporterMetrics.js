@@ -21,6 +21,18 @@ export const EXPORTER_METRICS = {
   },
 };
 
-// 알림 규칙에서 고를 수 있는 지표 — [{ key: 'mc_tps', label: 'TPS' }, ...] (Exporter가 없으면 빈 목록)
-export const alertMetricsFor = (exporter) => Object.values(EXPORTER_METRICS[exporter]?.metrics ?? {})
-  .map(({ metric, label }) => ({ key: metric, label }));
+// Exporter와 상관없이 Prometheus가 수집 대상마다 기록하는 지표.
+// up: 마지막 수집에 성공하면 1, 실패하면 0 — 플러그인이 서버 안에서 돌기 때문에 서버가 꺼지면 0이 된다.
+// (서버가 꺼지면 mc_* 지표는 값이 낮아지는 게 아니라 사라지므로, 꺼짐은 up으로만 잡을 수 있다)
+const COMMON_ALERT_METRICS = [
+  { key: 'up', label: '서버 상태 (켜짐 1 / 꺼짐 0)' },
+];
+
+// 알림 규칙에서 고를 수 있는 지표 — [{ key: 'up', label: ... }, { key: 'mc_tps', label: 'TPS' }, ...]
+// (데이터 소스·Exporter가 없으면 빈 목록)
+export const alertMetricsFor = (exporter) => (EXPORTER_METRICS[exporter]
+  ? [
+    ...COMMON_ALERT_METRICS,
+    ...Object.values(EXPORTER_METRICS[exporter].metrics).map(({ metric, label }) => ({ key: metric, label })),
+  ]
+  : []);

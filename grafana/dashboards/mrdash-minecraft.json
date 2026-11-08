@@ -8,7 +8,7 @@
   "editable": false,
   "graphTooltip": 1,
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "time": {
     "from": "now-10m",
     "to": "now"
@@ -77,6 +77,88 @@
   },
   "panels": [
     {
+      "id": 6,
+      "type": "state-timeline",
+      "title": "서버 상태",
+      "description": "Prometheus가 PrometheusExporter 플러그인에서 지표를 가져왔는지 (up). 서버가 꺼지면 플러그인도 멈춰 OFF가 된다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "OFF",
+                  "color": "#e34948",
+                  "index": 0
+                },
+                "1": {
+                  "text": "ON",
+                  "color": "#1baf7a",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e34948",
+                "value": null
+              },
+              {
+                "color": "#1baf7a",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "auto",
+        "mergeValues": true,
+        "alignValue": "center",
+        "rowHeight": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max(up{job=\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "서버"
+        }
+      ]
+    },
+    {
       "id": 1,
       "type": "timeseries",
       "title": "접속자 수",
@@ -86,7 +168,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 0,
+        "y": 6,
         "w": 12,
         "h": 8
       },
@@ -159,7 +241,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 0,
+        "y": 6,
         "w": 12,
         "h": 8
       },
@@ -237,7 +319,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 8,
+        "y": 14,
         "w": 12,
         "h": 8
       },
@@ -310,7 +392,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 8,
+        "y": 14,
         "w": 12,
         "h": 8
       },
@@ -384,7 +466,7 @@
       "description": "JVM 힙 — 사용 = 할당(allocated) − 여유(free), 최대 = -Xmx (mc_jvm_memory)",
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 22,
         "w": 12,
         "h": 8
       },

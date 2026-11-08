@@ -101,6 +101,7 @@ function ServerMonitoring() {
       <section className="monitoring-section">
         <h3 className="monitoring-section-title">일반</h3>
         <div className="monitoring-charts-grid monitoring-charts-grid-fill">
+          {panel('status', '서버 상태')}
           {panel('players', '접속자 수')}
         </div>
       </section>
