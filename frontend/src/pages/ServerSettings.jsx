@@ -7,6 +7,12 @@ import PrometheusIcon from '../components/PrometheusIcon'
 import './MinecraftServers.css'
 import './ServerSettings.css'
 
+// 모니터링 알림 요약 — server.alertSummary = { rules, channels, webhooks }
+// (알림 설정 저장은 아직 없어서, 백엔드가 이 값을 내려주기 전까지는 항상 "설정된 경고가 없습니다.")
+const alertSummaryLabel = (summary) => (summary?.rules > 0
+  ? `${summary.rules}개 상황을 감지해 연결된 ${summary.channels ?? 0}개 채널과 ${summary.webhooks ?? 0}개 웹후크에 알림을 전송합니다.`
+  : '설정된 경고가 없습니다.')
+
 const DATA_SOURCE_LABELS = {
   PROMETHEUS: 'Prometheus',
 }
@@ -243,6 +249,20 @@ function ServerSettings() {
               </button>
             </div>
           )}
+        </div>
+
+        <div className="server-form-row">
+          <label>모니터링 알림 설정</label>
+          <div className="monitoring-source-row">
+            <span className="monitoring-source-label">{alertSummaryLabel(server.alertSummary)}</span>
+            <button
+              type="button"
+              className="console-token-button monitoring-source-connect"
+              onClick={() => navigate(`/settings/alert/${server.id}`)}
+            >
+              경보 설정
+            </button>
+          </div>
         </div>
 
         <div className="server-form-row">

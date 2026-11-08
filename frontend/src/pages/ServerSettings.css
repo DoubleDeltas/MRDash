@@ -170,3 +170,104 @@
   color: #ED4245;
   font-size: 0.8rem;
 }
+
+/* 모니터링 알림 설정 */
+.alert-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.alert-section + .alert-section {
+  border-top: 1px solid #202225;
+  padding-top: 1rem;
+}
+
+.alert-section-title {
+  margin: 0;
+  color: #FFFFFF;
+  font-size: 1.05rem;
+}
+
+.alert-empty {
+  margin: 0;
+  color: #72767d;
+  font-size: 0.85rem;
+}
+
+/* 규칙·웹후크 한 줄 — 입력칸들 + 오른쪽 삭제 버튼 */
+.alert-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.alert-row select,
+.alert-row input {
+  background: #202225;
+  border: 1px solid #36393F;
+  color: #FFFFFF;
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.alert-row select:focus,
+.alert-row input:focus {
+  outline: none;
+  border-color: #7289DA;
+}
+
+.alert-rule-key {
+  flex: 1;
+}
+
+.alert-rule-op {
+  width: 5rem;
+}
+
+.alert-rule-threshold {
+  width: 8rem;
+}
+
+.alert-webhook-url {
+  flex: 1;
+}
+
+.alert-row-delete {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #B9BBBE;
+  cursor: pointer;
+}
+
+.alert-row-delete:hover {
+  background: #36393F;
+  color: #ED4245;
+}
+
+.alert-add-button {
+  align-self: stretch;
+}
+
+@media (max-width: 480px) {
+  .alert-rule-row {
+    flex-wrap: wrap;
+  }
+
+  .alert-rule-key {
+    flex-basis: 100%;
+  }
+
+  .alert-rule-threshold {
+    flex: 1;
+  }
+}

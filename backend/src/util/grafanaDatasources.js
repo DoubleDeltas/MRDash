@@ -29,25 +29,26 @@ const grafanaApi = async (method, path, body) => {
   return res.status === 204 ? {} : res.json();
 };
 
-const datasourceFor = (server) => {
-  const uid = serverDatasourceUid(server.id);
+// source: { serverId, url, token } — PrometheusDataSource의 외부 Prometheus 설정
+const datasourceFor = ({ serverId, url, token }) => {
+  const uid = serverDatasourceUid(serverId);
   return {
     uid,
     name: uid,
     type: 'prometheus',
     access: 'proxy',
-    url: server.prometheusUrl,
+    url,
     // 토큰이 있으면 Grafana가 Prometheus에 Authorization 헤더로 붙인다 (토큰은 Grafana가 암호화해서 보관)
     jsonData: {
       timeInterval: '15s',
-      ...(server.prometheusToken && { httpHeaderName1: 'Authorization' }),
+      ...(token && { httpHeaderName1: 'Authorization' }),
     },
-    secureJsonData: server.prometheusToken ? { httpHeaderValue1: `Bearer ${server.prometheusToken}` } : {},
+    secureJsonData: token ? { httpHeaderValue1: `Bearer ${token}` } : {},
   };
 };
 
-const upsert = async (server) => {
-  const body = datasourceFor(server);
+const upsert = async (source) => {
+  const body = datasourceFor(source);
   const existing = await grafanaApi('GET', `/api/datasources/uid/${body.uid}`);
   if (existing) {
     await grafanaApi('PUT', `/api/datasources/uid/${body.uid}`, body);
@@ -58,18 +59,23 @@ const upsert = async (server) => {
 
 const remove = (serverId) => grafanaApi('DELETE', `/api/datasources/uid/${serverDatasourceUid(serverId)}`);
 
-const needsDatasource = (server) => server.monitoringDataSource === 'PROMETHEUS' && Boolean(server.prometheusUrl);
+// 외부 Prometheus(url 있음)를 쓰는 Prometheus 데이터 소스만 Grafana 데이터 소스가 필요하다
+const EXTERNAL_PROMETHEUS_SELECT = { serverId: true, prometheus: { select: { url: true, token: true } } };
+
+const toSource = (dataSource) => (dataSource?.prometheus?.url
+  ? { serverId: dataSource.serverId, url: dataSource.prometheus.url, token: dataSource.prometheus.token }
+  : null);
 
 // 서버 하나의 설정을 Grafana에 반영 (저장·해제·삭제 직후). 실패해도 MRDash 저장은 그대로 두고, 주기적 재동기화가 다시 맞춘다.
 export const syncServerDatasource = async (serverId) => {
   if (!isConfigured()) return;
   try {
-    const server = await prisma.minecraftServer.findUnique({
-      where: { id: serverId },
-      select: { id: true, monitoringDataSource: true, prometheusUrl: true, prometheusToken: true },
-    });
-    if (server && needsDatasource(server)) {
-      await upsert(server);
+    const source = toSource(await prisma.monitoringDataSource.findFirst({
+      where: { serverId, type: 'PROMETHEUS' },
+      select: EXTERNAL_PROMETHEUS_SELECT,
+    }));
+    if (source) {
+      await upsert(source);
     } else {
       await remove(serverId);
     }
@@ -82,13 +88,14 @@ export const syncServerDatasource = async (serverId) => {
 export const syncAllServerDatasources = async () => {
   if (!isConfigured()) return;
   try {
-    const servers = await prisma.minecraftServer.findMany({
-      select: { id: true, monitoringDataSource: true, prometheusUrl: true, prometheusToken: true },
+    const dataSources = await prisma.monitoringDataSource.findMany({
+      where: { type: 'PROMETHEUS' },
+      select: EXTERNAL_PROMETHEUS_SELECT,
     });
-    const wanted = servers.filter(needsDatasource);
-    for (const server of wanted) await upsert(server);
+    const wanted = dataSources.map(toSource).filter(Boolean);
+    for (const source of wanted) await upsert(source);
 
-    const wantedUids = new Set(wanted.map((s) => serverDatasourceUid(s.id)));
+    const wantedUids = new Set(wanted.map((s) => serverDatasourceUid(s.serverId)));
     const existing = (await grafanaApi('GET', '/api/datasources')) ?? [];
     for (const ds of existing) {
       if (ds.uid?.startsWith(UID_PREFIX) && !wantedUids.has(ds.uid)) {

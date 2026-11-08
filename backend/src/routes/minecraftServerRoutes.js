@@ -1,5 +1,6 @@
 import express from 'express';
 import { getAll, getById, getImage, getStatus, getAgentStatus, create, update, deleteServer, issueConsoleToken, connectMonitoringDataSource, disconnectMonitoringDataSource, testMonitoringDataSource } from '../controllers/MinecraftServerController.js';
+import { getMonitoringAlert, saveMonitoringAlert } from '../controllers/MonitoringAlertController.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
 import { requireAdminOrOwner } from '../middleware/requireAdminOrOwner.js';
 
@@ -18,5 +19,7 @@ router.post('/:id/console-token', requireAdminOrOwner, issueConsoleToken);
 router.put('/:id/monitoring-data-source', requireAdminOrOwner, connectMonitoringDataSource);
 router.delete('/:id/monitoring-data-source', requireAdminOrOwner, disconnectMonitoringDataSource);
 router.post('/:id/monitoring-data-source/test', requireAdminOrOwner, testMonitoringDataSource);
+router.get('/:id/monitoring-alert', requireAdminOrOwner, getMonitoringAlert);
+router.put('/:id/monitoring-alert', requireAdminOrOwner, saveMonitoringAlert);
 
 export default router;

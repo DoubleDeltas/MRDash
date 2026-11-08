@@ -12,7 +12,7 @@ export const GRAFANA_DASHBOARDS = {
   // PrometheusExporter 플러그인 (backend/src/util/exporterMetrics.js의 MINECRAFT_PROMETHEUS_EXPORTER)
   minecraft: {
     uid: 'mrdash-minecraft',
-    panels: { players: 1, tps: 2, entities: 3, chunks: 4 },
+    panels: { players: 1, tps: 2, entities: 3, chunks: 4, heap: 5 },
   },
 }
 

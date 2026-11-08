@@ -44,12 +44,22 @@ enum MinecraftPlatform {
   QUILT
 }
 
-enum MonitoringDataSource {
+enum MonitoringDataSourceType {
   PROMETHEUS
 }
 
 enum PrometheusExporter {
   MINECRAFT_PROMETHEUS_EXPORTER
+}
+
+// 알림 규칙의 비교 연산자 (Prisma enum 값은 식별자만 가능해서 이름으로 둔다)
+enum MonitoringAlertOp {
+  GT // >
+  LT // <
+  GTE // >=
+  LTE // <=
+  NEQ // !=
+  EQ // ==
 }
 
 model MinecraftServer {
@@ -61,11 +71,7 @@ model MinecraftServer {
   color                String?
   consoleToken         String?
   monitoringDataSource MonitoringDataSource?
-  prometheusUrl        String?               @db.VarChar(512)
-  prometheusToken      String?               @db.Text
-  prometheusJob        String?
-  prometheusInstance   String?
-  prometheusExporter   PrometheusExporter?
+  monitoringAlert      MonitoringAlert?
   mcVersion            String
   mcPlatform           MinecraftPlatform
   ownerId              String?
@@ -73,4 +79,75 @@ model MinecraftServer {
   managers             User[]                @relation("ServerManagers")
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+}
+
+// 서버의 모니터링 데이터 소스 (서버당 하나). 종류별 설정은 type에 맞는 하위 모델에 둔다.
+model MonitoringDataSource {
+  id         Int                      @id @default(autoincrement())
+  type       MonitoringDataSourceType
+  serverId   Int                      @unique
+  server     MinecraftServer          @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  prometheus PrometheusDataSource?
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+}
+
+// type = PROMETHEUS 인 데이터 소스의 설정
+model PrometheusDataSource {
+  id           Int                  @id @default(autoincrement())
+  dataSourceId Int                  @unique
+  dataSource   MonitoringDataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  // null이면 MRDash Prometheus(백엔드의 PROMETHEUS_URL), 값이 있으면 외부 Prometheus
+  url          String?              @db.VarChar(512)
+  token        String?              @db.Text
+  // Job Name·Exporter가 생기기 전에 연결한 서버는 비어 있을 수 있다 (새로 저장할 때는 API가 필수로 받는다)
+  job          String?
+  instance     String?
+  exporter     PrometheusExporter?
+}
+
+// 서버의 모니터링 알림 설정 (서버당 하나) — 규칙 중 하나라도 맞으면 연결된 디스코드 채널·웹후크로 알림을 보낸다
+model MonitoringAlert {
+  id        Int                      @id @default(autoincrement())
+  serverId  Int                      @unique
+  server    MinecraftServer          @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  rules     MonitoringAlertRule[]
+  channels  MonitoringAlertChannel[]
+  webhooks  MonitoringAlertWebhook[]
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+}
+
+// 알림 규칙: <key의 값> <op> <threshold> 이면 알림 (예: mc_tps < 18)
+model MonitoringAlertRule {
+  id        Int               @id @default(autoincrement())
+  alertId   Int
+  alert     MonitoringAlert   @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  // Prometheus에서 수집되는 데이터의 키 (지표 이름, 예: mc_tps)
+  key       String
+  op        MonitoringAlertOp
+  threshold Float
+
+  @@index([alertId])
+}
+
+// 알림을 보낼 디스코드 채널 ("테트라" 봇이 볼 수 있는 채널)
+model MonitoringAlertChannel {
+  id        Int             @id @default(autoincrement())
+  alertId   Int
+  alert     MonitoringAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  // 디스코드 채널 id (snowflake)
+  channelId String          @db.VarChar(32)
+
+  @@unique([alertId, channelId])
+}
+
+// 알림을 보낼 디스코드 웹후크 (URL에 토큰이 들어 있으므로 API 응답에 그대로 싣지 않는다)
+model MonitoringAlertWebhook {
+  id      Int             @id @default(autoincrement())
+  alertId Int
+  alert   MonitoringAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  url     String          @db.VarChar(512)
+
+  @@unique([alertId, url])
 }
