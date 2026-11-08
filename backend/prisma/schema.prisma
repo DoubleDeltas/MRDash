@@ -44,7 +44,7 @@ enum MinecraftPlatform {
   QUILT
 }
 
-enum MonitoringDataSource {
+enum MonitoringDataSourceType {
   PROMETHEUS
 }
 
@@ -61,11 +61,6 @@ model MinecraftServer {
   color                String?
   consoleToken         String?
   monitoringDataSource MonitoringDataSource?
-  prometheusUrl        String?               @db.VarChar(512)
-  prometheusToken      String?               @db.Text
-  prometheusJob        String?
-  prometheusInstance   String?
-  prometheusExporter   PrometheusExporter?
   mcVersion            String
   mcPlatform           MinecraftPlatform
   ownerId              String?
@@ -73,4 +68,29 @@ model MinecraftServer {
   managers             User[]                @relation("ServerManagers")
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+}
+
+// 서버의 모니터링 데이터 소스 (서버당 하나). 종류별 설정은 type에 맞는 하위 모델에 둔다.
+model MonitoringDataSource {
+  id         Int                      @id @default(autoincrement())
+  type       MonitoringDataSourceType
+  serverId   Int                      @unique
+  server     MinecraftServer          @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  prometheus PrometheusDataSource?
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+}
+
+// type = PROMETHEUS 인 데이터 소스의 설정
+model PrometheusDataSource {
+  id           Int                  @id @default(autoincrement())
+  dataSourceId Int                  @unique
+  dataSource   MonitoringDataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  // null이면 MRDash Prometheus(백엔드의 PROMETHEUS_URL), 값이 있으면 외부 Prometheus
+  url          String?              @db.VarChar(512)
+  token        String?              @db.Text
+  // Job Name·Exporter가 생기기 전에 연결한 서버는 비어 있을 수 있다 (새로 저장할 때는 API가 필수로 받는다)
+  job          String?
+  instance     String?
+  exporter     PrometheusExporter?
 }

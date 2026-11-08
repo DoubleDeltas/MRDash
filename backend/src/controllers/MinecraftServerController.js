@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { MinecraftPlatform, MonitoringDataSource, PrometheusExporter } from '@prisma/client';
+import { MinecraftPlatform, MonitoringDataSourceType, PrometheusExporter } from '@prisma/client';
 import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
 import { EXPORTER_METRICS } from '../util/exporterMetrics.js';
@@ -7,17 +7,30 @@ import { syncServerDatasource } from '../util/grafanaDatasources.js';
 import { PrometheusHttpError, buildSelector, queryInstant } from '../util/prometheus.js';
 import { isAgentConnected } from '../ws/consoleHub.js';
 
-// 응답에는 원본 image bytes/consoleToken/prometheusToken 대신 보유 여부만 내려주고,
-// managers 관계는 id 배열(managerIds)로 평탄화해서 내려준다
-const toPublicServer = ({ image, consoleToken, prometheusToken, managers, ...server }) => ({
-  ...server,
-  hasImage: image !== null,
-  hasConsoleToken: consoleToken !== null,
-  hasPrometheusToken: prometheusToken != null,
-  managerIds: (managers || []).map((m) => m.id),
-});
+// 응답에는 원본 image bytes/consoleToken/Prometheus 토큰 대신 보유 여부만 내려주고,
+// managers 관계는 id 배열(managerIds)로 평탄화해서 내려준다.
+// 모니터링 데이터 소스(MonitoringDataSource → PrometheusDataSource)도 테이블을 나누기 전의 응답 모양 그대로 평탄화한다.
+const toPublicServer = ({ image, consoleToken, managers, monitoringDataSource, ...server }) => {
+  const prometheus = monitoringDataSource?.prometheus;
+  return {
+    ...server,
+    hasImage: image !== null,
+    hasConsoleToken: consoleToken !== null,
+    managerIds: (managers || []).map((m) => m.id),
+    monitoringDataSource: monitoringDataSource?.type ?? null,
+    prometheusUrl: prometheus?.url ?? null,
+    prometheusJob: prometheus?.job ?? null,
+    prometheusInstance: prometheus?.instance ?? null,
+    prometheusExporter: prometheus?.exporter ?? null,
+    hasPrometheusToken: prometheus?.token != null,
+  };
+};
 
-const MANAGERS_INCLUDE = { managers: { select: { id: true } } };
+// toPublicServer에 필요한 관계
+const SERVER_INCLUDE = {
+  managers: { select: { id: true } },
+  monitoringDataSource: { include: { prometheus: true } },
+};
 
 const decodeImageBase64 = (dataUrl) => {
   const match = /^data:image\/\w+;base64,(.+)$/.exec(dataUrl || '');
@@ -38,7 +51,7 @@ const isValidHttpUrl = (value) => {
 // 전체 서버 목록 조회
 export const getAll = async (req, res) => {
   try {
-    const servers = await prisma.minecraftServer.findMany({ include: MANAGERS_INCLUDE });
+    const servers = await prisma.minecraftServer.findMany({ include: SERVER_INCLUDE });
     res.json({ success: true, data: servers.map(toPublicServer) });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -51,7 +64,7 @@ export const getById = async (req, res) => {
     const { id } = req.params;
     const server = await prisma.minecraftServer.findUnique({
       where: { id: parseInt(id) },
-      include: MANAGERS_INCLUDE,
+      include: SERVER_INCLUDE,
     });
 
     if (!server) {
@@ -186,8 +199,8 @@ export const connectMonitoringDataSource = async (req, res) => {
     const { id } = req.params;
     const { dataSource, exporter } = req.body;
 
-    if (!Object.values(MonitoringDataSource).includes(dataSource)) {
-      return res.status(400).json({ success: false, error: `dataSource must be one of: ${Object.values(MonitoringDataSource).join(', ')}` });
+    if (!Object.values(MonitoringDataSourceType).includes(dataSource)) {
+      return res.status(400).json({ success: false, error: `dataSource must be one of: ${Object.values(MonitoringDataSourceType).join(', ')}` });
     }
 
     // 지금은 Prometheus뿐이라 연결 정보도 Prometheus용 필드만 받는다.
@@ -199,29 +212,41 @@ export const connectMonitoringDataSource = async (req, res) => {
       return res.status(400).json({ success: false, error: `exporter must be one of: ${Object.values(PrometheusExporter).join(', ')}` });
     }
 
-    const server = await prisma.minecraftServer.update({
-      where: { id: parseInt(id) },
-      data: {
-        monitoringDataSource: dataSource,
-        prometheusUrl: settings.url,
-        // 토큰은 응답으로 돌려주지 않으므로, 새 값을 보냈을 때만 바꾸고 안 보내면 기존 값을 유지한다
-        ...(settings.target === 'MRDASH' || settings.clearToken
-          ? { prometheusToken: null }
-          : settings.token && { prometheusToken: settings.token }),
-        prometheusJob: settings.job,
-        prometheusInstance: settings.instance,
-        prometheusExporter: exporter,
-      },
-      include: MANAGERS_INCLUDE,
-    });
-    // 외부 Prometheus면 Grafana 데이터 소스를 만들거나 고치고, MRDash Prometheus로 바꿨으면 지운다
-    await syncServerDatasource(server.id);
-
-    res.json({ success: true, data: toPublicServer(server) });
-  } catch (error) {
-    if (error.code === 'P2025') {
+    const serverId = parseInt(id);
+    if (!(await prisma.minecraftServer.findUnique({ where: { id: serverId }, select: { id: true } }))) {
       return res.status(404).json({ success: false, error: 'Server not found' });
     }
+
+    const prometheus = {
+      url: settings.url,
+      job: settings.job,
+      instance: settings.instance,
+      exporter,
+    };
+    // 토큰은 응답으로 돌려주지 않으므로, 새 값을 보냈을 때만 바꾸고 안 보내면 기존 값을 유지한다
+    const resetToken = settings.target === 'MRDASH' || settings.clearToken;
+    const newToken = resetToken ? null : settings.token;
+
+    // 서버당 데이터 소스 하나 — 있으면 고치고 없으면 만든다
+    await prisma.monitoringDataSource.upsert({
+      where: { serverId },
+      create: { serverId, type: dataSource, prometheus: { create: { ...prometheus, token: newToken } } },
+      update: {
+        type: dataSource,
+        prometheus: {
+          upsert: {
+            create: { ...prometheus, token: newToken },
+            update: { ...prometheus, ...((resetToken || newToken) && { token: newToken }) },
+          },
+        },
+      },
+    });
+    // 외부 Prometheus면 Grafana 데이터 소스를 만들거나 고치고, MRDash Prometheus로 바꿨으면 지운다
+    await syncServerDatasource(serverId);
+
+    const server = await prisma.minecraftServer.findUnique({ where: { id: serverId }, include: SERVER_INCLUDE });
+    res.json({ success: true, data: toPublicServer(server) });
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -256,14 +281,15 @@ export const testMonitoringDataSource = async (req, res) => {
 
     const server = await prisma.minecraftServer.findUnique({
       where: { id: parseInt(id) },
-      select: { prometheusToken: true },
+      select: { monitoringDataSource: { select: { prometheus: { select: { token: true } } } } },
     });
     if (!server) {
       return res.status(404).json({ success: false, error: 'Server not found' });
     }
 
     // 토큰 칸을 비워 두면 저장된 토큰으로 테스트한다 (저장할 때와 같은 규칙)
-    const token = settings.clearToken ? null : settings.token || server.prometheusToken;
+    const savedToken = server.monitoringDataSource?.prometheus?.token ?? null;
+    const token = settings.clearToken ? null : settings.token || savedToken;
     const source = settings.url ? { baseUrl: settings.url, token } : {};
     const selector = buildSelector(settings.job, settings.instance);
 
@@ -302,25 +328,18 @@ export const disconnectMonitoringDataSource = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const server = await prisma.minecraftServer.update({
-      where: { id: parseInt(id) },
-      data: {
-        monitoringDataSource: null,
-        prometheusUrl: null,
-        prometheusToken: null,
-        prometheusJob: null,
-        prometheusInstance: null,
-        prometheusExporter: null,
-      },
-      include: MANAGERS_INCLUDE,
-    });
-    await syncServerDatasource(server.id);
-
-    res.json({ success: true, data: toPublicServer(server) });
-  } catch (error) {
-    if (error.code === 'P2025') {
+    const serverId = parseInt(id);
+    if (!(await prisma.minecraftServer.findUnique({ where: { id: serverId }, select: { id: true } }))) {
       return res.status(404).json({ success: false, error: 'Server not found' });
     }
+
+    // PrometheusDataSource는 onDelete: Cascade로 같이 지워진다
+    await prisma.monitoringDataSource.deleteMany({ where: { serverId } });
+    await syncServerDatasource(serverId);
+
+    const server = await prisma.minecraftServer.findUnique({ where: { id: serverId }, include: SERVER_INCLUDE });
+    res.json({ success: true, data: toPublicServer(server) });
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -352,7 +371,7 @@ export const create = async (req, res) => {
         color: color || null,
         image: decodeImageBase64(imageBase64),
       },
-      include: MANAGERS_INCLUDE,
+      include: SERVER_INCLUDE,
     });
 
     res.status(201).json({ success: true, data: toPublicServer(server) });
@@ -405,7 +424,7 @@ export const update = async (req, res) => {
         ...(ownerId !== undefined && { ownerId: ownerId || null }),
         ...(managerIds !== undefined && { managers: { set: managerIds.map((managerId) => ({ id: managerId })) } }),
       },
-      include: MANAGERS_INCLUDE,
+      include: SERVER_INCLUDE,
     });
 
     res.json({ success: true, data: toPublicServer(updatedServer) });
