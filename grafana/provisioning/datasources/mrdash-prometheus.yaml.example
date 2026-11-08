@@ -2,14 +2,14 @@
 # Grafana는 *.yaml / *.yml만 읽으므로 이 파일은 그대로 두면 무시된다.
 # 라이브 서버의 grafana/provisioning/datasources/에 .yaml로 복사하고 url을 맞춰 쓴다.
 #
-# uid는 반드시 mrdash-host — MRDash 경보 규칙이 이 uid로 데이터 소스를 지정한다
-# (backend의 GRAFANA_DEFAULT_DATASOURCE_UID로 바꿀 수 있음).
-# 대시보드 uid "mrdash-host"와 같은 문자열이지만 Grafana에서 데이터 소스와 대시보드는 따로 관리되므로 겹치지 않는다.
+# MRDash 경보 규칙은 GRAFANA_DEFAULT_DATASOURCE_UID(설정했으면) → 기본(isDefault) Prometheus 데이터 소스를 쓴다.
+# 그래서 isDefault: true가 중요하다. uid는 아무 값이나 되지만 라이브와 맞춰 mrdash-prometheus로 둔다.
+
 apiVersion: 1
 
 datasources:
   - name: Prometheus
-    uid: mrdash-host
+    uid: mrdash-prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090   # ddeltas-net에서 Grafana가 닿는 Prometheus 주소
