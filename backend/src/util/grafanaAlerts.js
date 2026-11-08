@@ -52,7 +52,19 @@ const RESYNC_INTERVAL_MS = 10 * 60 * 1000;
 export const ALERT_LABELS = { serverId: 'mrdash_server_id' };
 
 // MRDash Prometheus를 쓰는 서버가 쓰는 Grafana 기본 데이터 소스 (grafana/provisioning/datasources)
-const defaultDatasourceUid = () => process.env.GRAFANA_DEFAULT_DATASOURCE_UID || 'mrdash-host';
+// 우선순위: GRAFANA_DEFAULT_DATASOURCE_UID → uid "mrdash-host" → Grafana가 기본으로 표시한 Prometheus 데이터 소스.
+// 없는 uid로 규칙을 만들면 평가 오류("data source not found")로 경보가 울리므로, 실제로 있는 것만 쓴다.
+const resolveDefaultDatasourceUid = (datasources) => {
+  const prometheus = datasources.filter((ds) => ds.type === 'prometheus');
+  const exists = (uid) => prometheus.some((ds) => ds.uid === uid);
+  const configured = process.env.GRAFANA_DEFAULT_DATASOURCE_UID;
+  if (configured) {
+    if (exists(configured)) return configured;
+    console.warn(`[grafana] GRAFANA_DEFAULT_DATASOURCE_UID="${configured}" is not a Prometheus datasource in Grafana`);
+  }
+  if (exists('mrdash-host')) return 'mrdash-host';
+  return prometheus.find((ds) => ds.isDefault)?.uid ?? null;
+};
 
 const receiverName = (serverId) => `mrdash-server-${serverId}`;
 const contactPointUidPrefix = (serverId) => `mrdash-s${serverId}-`;
@@ -73,11 +85,12 @@ const ruleSummary = (rule) => `${METRIC_LABELS[rule.key] ?? rule.key} ${OP_SYMBO
 
 const EXPR_DATASOURCE = { type: '__expr__', uid: '__expr__' };
 
-// A: Prometheus 조회 → B: 마지막 값 → C: 비교식 (참이면 1 = 경보)
-const toGrafanaRule = (server, rule, index) => {
+// A: Prometheus 범위 조회(최근 5분) → B: 마지막 값(빈 값 제외) → C: 비교식 (참이면 1 = 경보).
+// reduce는 시계열을 받는 단계라 A를 instant 조회로 두면 평가 오류가 날 수 있어 범위 조회로 둔다 (Grafana 기본 규칙 형태).
+const toGrafanaRule = (server, rule, index, defaultUid) => {
   const prometheus = server.monitoringDataSource.prometheus;
   const selector = buildSelector(prometheus.job, prometheus.instance);
-  const datasourceUid = prometheus.url ? serverDatasourceUid(server.id) : defaultDatasourceUid();
+  const datasourceUid = prometheus.url ? serverDatasourceUid(server.id) : defaultUid;
   return {
     uid: `${contactPointUidPrefix(server.id)}r${index}`,
     title: `서버 ${server.id} · ${ruleSummary(rule)} (#${index + 1})`,
@@ -88,14 +101,28 @@ const toGrafanaRule = (server, rule, index) => {
       {
         refId: 'A',
         datasourceUid,
-        relativeTimeRange: { from: 600, to: 0 },
-        model: { refId: 'A', expr: `${AGGREGATES[rule.key] ?? 'max'}(${rule.key}{${selector}})`, instant: true, range: false },
+        relativeTimeRange: { from: 300, to: 0 },
+        model: {
+          refId: 'A',
+          expr: `${AGGREGATES[rule.key] ?? 'max'}(${rule.key}{${selector}})`,
+          range: true,
+          instant: false,
+          intervalMs: 15000,
+          maxDataPoints: 43200,
+        },
       },
       {
         refId: 'B',
         datasourceUid: EXPR_DATASOURCE.uid,
         relativeTimeRange: { from: 0, to: 0 },
-        model: { refId: 'B', type: 'reduce', expression: 'A', reducer: 'last', datasource: EXPR_DATASOURCE },
+        model: {
+          refId: 'B',
+          type: 'reduce',
+          expression: 'A',
+          reducer: 'last',
+          settings: { mode: 'dropNN' },
+          datasource: EXPR_DATASOURCE,
+        },
       },
       {
         refId: 'C',
@@ -116,7 +143,13 @@ const toGrafanaRule = (server, rule, index) => {
 };
 
 const DISCORD_TITLE = '{{ if eq .Status "firing" }}🚨 MRDash 경보{{ else }}✅ MRDash 경보 해제{{ end }}';
-const DISCORD_MESSAGE = '{{ range .Alerts }}{{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} **{{ .Annotations.server }}** — {{ .Annotations.summary }}{{ if eq .Status "firing" }} (현재 값 {{ index .Values "B" }}){{ end }}\n{{ end }}';
+// 값은 실제로 계산됐을 때만 보여준다 (평가 오류·데이터 없음 경보에는 값이 없어 index가 0을 내놓는다).
+// 평가 오류는 Grafana가 alertname=DatasourceError, 데이터 없음은 DatasourceNoData로 보낸다.
+const DISCORD_MESSAGE = '{{ range .Alerts }}{{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} **{{ .Annotations.server }}** — {{ .Annotations.summary }}'
+  + '{{ if eq .Labels.alertname "DatasourceError" }} (조회 오류{{ with .Annotations.Error }}: {{ . }}{{ end }})'
+  + '{{ else if eq .Labels.alertname "DatasourceNoData" }} (데이터 없음)'
+  + '{{ else if and (eq .Status "firing") .Values }} (현재 값 {{ index .Values "B" }})'
+  + '{{ end }}\n{{ end }}';
 
 const webhookUrl = () => process.env.GRAFANA_ALERT_WEBHOOK_URL || 'http://mrdash-backend:3000/internal/grafana/alerts';
 
@@ -179,7 +212,13 @@ const hasAlertRules = (server) => server.monitoringDataSource?.type === 'PROMETH
 
 const doSync = async () => {
   await ensureFolder();
-  const servers = (await loadServers()).filter(hasAlertRules);
+  // MRDash Prometheus를 쓰는 서버의 규칙이 쓸 기본 데이터 소스 — 없으면 그 서버들은 규칙을 만들지 않는다
+  const defaultUid = resolveDefaultDatasourceUid((await grafanaApi('GET', '/api/datasources')) ?? []);
+  const servers = (await loadServers()).filter(hasAlertRules).filter((server) => {
+    if (server.monitoringDataSource.prometheus.url || defaultUid) return true;
+    console.warn(`[grafana] server ${server.id}: no default Prometheus datasource in Grafana (uid mrdash-host or isDefault) — alert rules skipped`);
+    return false;
+  });
 
   // 1) 알림 대상: 만들거나 고친다 (지우는 건 알림 경로에서 빠진 뒤에)
   const desiredPoints = servers.flatMap(contactPointsFor);
@@ -228,7 +267,7 @@ const doSync = async () => {
       title: group,
       folderUid: FOLDER_UID,
       interval: evaluationIntervalSec(),
-      rules: server.monitoringAlert.rules.map((rule, i) => toGrafanaRule(server, rule, i)),
+      rules: server.monitoringAlert.rules.map((rule, i) => toGrafanaRule(server, rule, i, defaultUid)),
     });
   }
   const desiredGroups = new Set(servers.map((s) => `${RULE_GROUP_PREFIX}${s.id}`));
