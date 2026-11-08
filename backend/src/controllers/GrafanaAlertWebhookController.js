@@ -36,12 +36,21 @@ const currentValue = (alert) => {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 };
 
+// 평가 오류·데이터 없음으로 울린 경보는 값이 없으므로 이유를 대신 보여준다
+const firingReason = (alert) => {
+  if (alert.labels?.alertname === 'DatasourceError') {
+    return `조회 오류로 경보 상태가 되었습니다.${alert.annotations?.Error ? `\n${alert.annotations.Error}` : ''}`;
+  }
+  if (alert.labels?.alertname === 'DatasourceNoData') return '데이터가 없어 경보 상태가 되었습니다.';
+  return '경보가 울렸습니다.';
+};
+
 const toEmbed = (alert, serverName) => {
   const firing = alert.status === 'firing';
   const value = currentValue(alert);
   return {
     title: `${firing ? '🚨' : '✅'} ${serverName} — ${alert.annotations?.summary ?? alert.labels?.alertname ?? '경보'}`,
-    description: firing ? '경보가 울렸습니다.' : '정상으로 돌아왔습니다.',
+    description: firing ? firingReason(alert) : '정상으로 돌아왔습니다.',
     color: firing ? COLOR_FIRING : COLOR_RESOLVED,
     fields: value === null ? [] : [{ name: '현재 값', value, inline: true }],
     timestamp: firing ? alert.startsAt : (alert.endsAt ?? new Date().toISOString()),
