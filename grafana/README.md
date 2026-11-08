@@ -33,10 +33,10 @@ MRDash의 모니터링 그래프(`/monitoring`, `/monitoring/:serverId`)는 MRDa
 
 ## 2. Prometheus 데이터 소스
 
-- **MRDash Prometheus (기본)**: `provisioning/datasources/`에 기본 Prometheus 데이터 소스를 **uid `mrdash-host`** 로 등록한다
-  (예시: `provisioning/datasources/mrdash-host.yaml.example` — 라이브 서버에서 `.yaml`로 복사해 url을 맞춘다).
+- **MRDash Prometheus (기본)**: `provisioning/datasources/`에 기본(`isDefault: true`) Prometheus 데이터 소스를 등록한다
+  (예시: `provisioning/datasources/mrdash-prometheus.yaml.example` — 라이브 서버에서 `.yaml`로 복사해 url을 맞춘다. 라이브 uid는 `mrdash-prometheus`).
   대시보드는 `datasource` 변수가 기본 데이터 소스를 고른다. 경보 규칙은 데이터 소스를 uid로 직접 지정하는데,
-  backend가 Grafana에 **실제로 있는** 것 중에서 `GRAFANA_DEFAULT_DATASOURCE_UID` → `mrdash-host` → 기본(isDefault) Prometheus 순으로 고른다.
+  backend가 Grafana에 **실제로 있는** 것 중에서 `GRAFANA_DEFAULT_DATASOURCE_UID` → 기본(isDefault) Prometheus 순으로 고른다.
   셋 다 없으면 MRDash Prometheus 서버의 규칙은 만들지 않고 로그를 남긴다 (없는 uid로 만들면 "data source not found" 평가 오류로 경보가 울린다).
 - **외부 Prometheus**: 서버 설정에서 외부 Prometheus를 고른 서버는 MRDash 백엔드가 Grafana API로
   `mrdash-server-<서버 id>` 데이터 소스를 자동으로 만들고/고치고/지운다 (`backend/src/util/grafanaDatasources.js`).

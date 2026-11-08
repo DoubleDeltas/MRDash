@@ -52,7 +52,7 @@ const RESYNC_INTERVAL_MS = 10 * 60 * 1000;
 export const ALERT_LABELS = { serverId: 'mrdash_server_id' };
 
 // MRDash Prometheus를 쓰는 서버가 쓰는 Grafana 기본 데이터 소스 (grafana/provisioning/datasources)
-// 우선순위: GRAFANA_DEFAULT_DATASOURCE_UID → uid "mrdash-host" → Grafana가 기본으로 표시한 Prometheus 데이터 소스.
+// 우선순위: GRAFANA_DEFAULT_DATASOURCE_UID → Grafana가 기본(isDefault)으로 표시한 Prometheus 데이터 소스.
 // 없는 uid로 규칙을 만들면 평가 오류("data source not found")로 경보가 울리므로, 실제로 있는 것만 쓴다.
 const resolveDefaultDatasourceUid = (datasources) => {
   const prometheus = datasources.filter((ds) => ds.type === 'prometheus');
@@ -62,7 +62,6 @@ const resolveDefaultDatasourceUid = (datasources) => {
     if (exists(configured)) return configured;
     console.warn(`[grafana] GRAFANA_DEFAULT_DATASOURCE_UID="${configured}" is not a Prometheus datasource in Grafana`);
   }
-  if (exists('mrdash-host')) return 'mrdash-host';
   return prometheus.find((ds) => ds.isDefault)?.uid ?? null;
 };
 
@@ -216,7 +215,7 @@ const doSync = async () => {
   const defaultUid = resolveDefaultDatasourceUid((await grafanaApi('GET', '/api/datasources')) ?? []);
   const servers = (await loadServers()).filter(hasAlertRules).filter((server) => {
     if (server.monitoringDataSource.prometheus.url || defaultUid) return true;
-    console.warn(`[grafana] server ${server.id}: no default Prometheus datasource in Grafana (uid mrdash-host or isDefault) — alert rules skipped`);
+    console.warn(`[grafana] server ${server.id}: no default Prometheus datasource in Grafana (GRAFANA_DEFAULT_DATASOURCE_UID or isDefault) — alert rules skipped`);
     return false;
   });
 
