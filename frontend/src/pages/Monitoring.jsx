@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { WS_BASE_URL } from '../api/client'
 import GrafanaPanel from '../components/GrafanaPanel'
 import { GRAFANA_DASHBOARDS, grafanaPanelUrl } from '../components/grafana'
-import MonitoringRangeSelect, { DEFAULT_RANGE_MINUTES, formatStep } from '../components/MonitoringRangeSelect'
+import MonitoringRangeSelect, { DEFAULT_RANGE, formatRefresh, resolveRange } from '../components/MonitoringRangeSelect'
 import './Monitoring.css'
 
 // 백엔드 /ws/monitoring 스트림의 point에 화면용 시간 라벨을 붙인다 (KPI 타일용)
@@ -16,20 +16,17 @@ function Monitoring() {
   // 'connecting': 백엔드 ws 연결 중 / 'ok': 데이터 수신 중 / 'unavailable': 백엔드가 Prometheus 조회에 실패
   const [status, setStatus] = useState('connecting')
   const [metrics, setMetrics] = useState({ data: [], memTotal: 0 })
-  const [rangeMinutes, setRangeMinutes] = useState(DEFAULT_RANGE_MINUTES)
-  // 백엔드가 기간에 맞춰 정한 조회 간격(초) — 기간이 길수록 길어진다
-  const [stepSec, setStepSec] = useState(null)
+  // 그래프(Grafana) 기간 — 위쪽 KPI 타일은 기간과 상관없이 최신 값만 쓴다
+  const [rangeId, setRangeId] = useState(DEFAULT_RANGE)
 
-  // 화면을 보고 있는 동안 백엔드가 선택한 기간의 Prometheus 조회 결과를 밀어준다.
-  // 기간을 바꾸면 새 기간으로 다시 연결한다 (새 데이터가 올 때까지는 이전 그래프를 보여준다).
+  // 화면을 보고 있는 동안 백엔드가 Prometheus 조회 결과를 밀어준다 (KPI 타일용 최신 값).
   useEffect(() => {
-    setStatus(prev => (prev === 'unavailable' ? prev : 'connecting'))
     let reconnectTimer = null
     let cancelled = false
     let ws = null
 
     const connect = () => {
-      ws = new WebSocket(`${WS_BASE_URL}/ws/monitoring?range=${rangeMinutes}`)
+      ws = new WebSocket(`${WS_BASE_URL}/ws/monitoring`)
 
       ws.onmessage = (event) => {
         let msg
@@ -41,7 +38,6 @@ function Monitoring() {
 
         if (msg.type === 'metrics') {
           setMetrics({ data: decoratePoints(msg.points), memTotal: msg.memTotal })
-          setStepSec(msg.stepSec)
           setStatus('ok')
         } else if (msg.type === 'unavailable') {
           setStatus('unavailable')
@@ -64,9 +60,10 @@ function Monitoring() {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       ws?.close()
     }
-  }, [rangeMinutes])
+  }, [])
 
   const { data, memTotal } = metrics
+  const range = resolveRange(rangeId)
   const currentPoint = data[data.length - 1] || {}
   const memRatio = memTotal ? (currentPoint.totalMemory || 0) / memTotal : 0
 
@@ -160,13 +157,13 @@ function Monitoring() {
               <option value="container">Docker 컨테이너별</option>
             </select>
           </div>
-          <MonitoringRangeSelect value={rangeMinutes} onChange={setRangeMinutes} />
+          <MonitoringRangeSelect value={rangeId} onChange={setRangeId} />
         </div>
 
         <div className="control-actions">
           <span className={`live-indicator ${status === 'ok' ? '' : 'live-indicator-off'}`}>
             <span className="live-dot" />
-            {status === 'ok' ? `실시간 (${formatStep(stepSec)} 주기)` : '불러오는 중...'}
+            {status === 'ok' ? `실시간 (${formatRefresh(range.refresh)} 주기)` : '불러오는 중...'}
           </span>
         </div>
       </div>
@@ -180,7 +177,7 @@ function Monitoring() {
           <GrafanaPanel
             key={panel}
             title={title}
-            src={grafanaPanelUrl(GRAFANA_DASHBOARDS.host, GRAFANA_DASHBOARDS.host.panels[panel], { rangeMinutes })}
+            src={grafanaPanelUrl(GRAFANA_DASHBOARDS.host, GRAFANA_DASHBOARDS.host.panels[panel], { range })}
           />
         ))}
       </div>

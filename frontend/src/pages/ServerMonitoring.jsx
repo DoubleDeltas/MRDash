@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { apiClient } from '../api/client'
 import GrafanaPanel from '../components/GrafanaPanel'
 import { GRAFANA_DASHBOARDS, grafanaPanelUrl, serverDatasourceUid } from '../components/grafana'
-import MonitoringRangeSelect, { DEFAULT_RANGE_MINUTES } from '../components/MonitoringRangeSelect'
+import MonitoringRangeSelect, { DEFAULT_RANGE, resolveRange } from '../components/MonitoringRangeSelect'
 import './Monitoring.css'
 
 // Exporter별 Grafana 대시보드
@@ -18,7 +18,7 @@ function ServerMonitoring() {
   const { serverId } = useParams()
   const [server, setServer] = useState(null)
   const [loadError, setLoadError] = useState(false)
-  const [rangeMinutes, setRangeMinutes] = useState(DEFAULT_RANGE_MINUTES)
+  const [rangeId, setRangeId] = useState(DEFAULT_RANGE)
 
   useEffect(() => {
     setServer(null)
@@ -76,11 +76,12 @@ function ServerMonitoring() {
     )
   }
 
+  const range = resolveRange(rangeId)
   const panel = (key, title) => (
     <GrafanaPanel
       title={title}
       src={grafanaPanelUrl(dashboard, dashboard.panels[key], {
-        rangeMinutes,
+        range,
         // Targets를 비워 두면 job 전체 ($__all → 대시보드의 instance=~".*")
         vars: {
           ...(server.prometheusUrl && { datasource: serverDatasourceUid(server.id) }),
@@ -94,7 +95,7 @@ function ServerMonitoring() {
   return (
     <div className="monitoring-page">
       <div className="monitoring-controls-bar">
-        <MonitoringRangeSelect value={rangeMinutes} onChange={setRangeMinutes} />
+        <MonitoringRangeSelect value={rangeId} onChange={setRangeId} />
       </div>
 
       <section className="monitoring-section">
