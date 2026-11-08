@@ -8,7 +8,7 @@
   "editable": false,
   "graphTooltip": 1,
   "schemaVersion": 39,
-  "version": 3,
+  "version": 4,
   "time": {
     "from": "now-10m",
     "to": "now"
@@ -94,7 +94,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "#898781"
           },
           "custom": {
             "lineWidth": 0,
@@ -104,15 +105,39 @@
             {
               "type": "value",
               "options": {
-                "0": {
-                  "text": "OFF",
-                  "color": "#e34948",
-                  "index": 0
-                },
                 "1": {
                   "text": "ON",
                   "color": "#1baf7a",
+                  "index": 0
+                },
+                "0": {
+                  "text": "OFF",
+                  "color": "#e34948",
                   "index": 1
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 0.5,
+                "to": null,
+                "result": {
+                  "text": "ON",
+                  "color": "#1baf7a",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": null,
+                "to": 0.5,
+                "result": {
+                  "text": "OFF",
+                  "color": "#e34948",
+                  "index": 3
                 }
               }
             }
@@ -121,12 +146,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#e34948",
+                "color": "#898781",
                 "value": null
-              },
-              {
-                "color": "#1baf7a",
-                "value": 1
               }
             ]
           }
@@ -139,7 +160,9 @@
         "alignValue": "center",
         "rowHeight": 0.8,
         "legend": {
-          "showLegend": false
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
         },
         "tooltip": {
           "mode": "single",
