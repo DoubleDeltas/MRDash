@@ -1,5 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
+import { grafanaBaseUrl } from '../util/grafanaApi.js';
 
 // /api/grafana/* → 같은 Docker 네트워크의 Grafana 컨테이너 (MRDash 전용 엔진).
 // 인증은 MRDash 세션 하나만 쓴다: 로그인한 사용자만 통과시키고, Grafana auth.proxy가 믿는 헤더에
@@ -24,7 +25,7 @@ export const grafanaProxy = (req, res) => {
     return;
   }
 
-  const target = new URL(req.originalUrl, process.env.GRAFANA_URL || 'http://grafana:3000');
+  const target = new URL(req.originalUrl, grafanaBaseUrl());
   const client = target.protocol === 'https:' ? https : http;
 
   const headers = { ...req.headers, host: target.host };

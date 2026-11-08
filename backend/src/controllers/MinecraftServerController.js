@@ -4,6 +4,7 @@ import { status as pingJavaServer } from 'minecraft-server-util';
 import { prisma } from '../config/prisma.js';
 import { EXPORTER_METRICS } from '../util/exporterMetrics.js';
 import { syncServerDatasource } from '../util/grafanaDatasources.js';
+import { syncGrafanaAlerts } from '../util/grafanaAlerts.js';
 import { PrometheusHttpError, buildSelector, queryInstant } from '../util/prometheus.js';
 import { isAgentConnected } from '../ws/consoleHub.js';
 
@@ -246,6 +247,7 @@ export const connectMonitoringDataSource = async (req, res) => {
     });
     // 외부 Prometheus면 Grafana 데이터 소스를 만들거나 고치고, MRDash Prometheus로 바꿨으면 지운다
     await syncServerDatasource(serverId);
+    await syncGrafanaAlerts();
 
     const server = await prisma.minecraftServer.findUnique({ where: { id: serverId }, include: SERVER_INCLUDE });
     res.json({ success: true, data: toPublicServer(server) });
@@ -339,6 +341,7 @@ export const disconnectMonitoringDataSource = async (req, res) => {
     // PrometheusDataSource는 onDelete: Cascade로 같이 지워진다
     await prisma.monitoringDataSource.deleteMany({ where: { serverId } });
     await syncServerDatasource(serverId);
+    await syncGrafanaAlerts();
 
     const server = await prisma.minecraftServer.findUnique({ where: { id: serverId }, include: SERVER_INCLUDE });
     res.json({ success: true, data: toPublicServer(server) });
@@ -429,6 +432,8 @@ export const update = async (req, res) => {
       },
       include: SERVER_INCLUDE,
     });
+    // 서버 이름이 Grafana 경보 문구(annotation)에 들어가므로, 이름을 바꿨으면 경보 설정도 다시 맞춘다
+    if (name && updatedServer.monitoringAlert) await syncGrafanaAlerts();
 
     res.json({ success: true, data: toPublicServer(updatedServer) });
   } catch (error) {
@@ -459,6 +464,7 @@ export const deleteServer = async (req, res) => {
       where: { id: parseInt(id) },
     });
     await syncServerDatasource(server.id);
+    await syncGrafanaAlerts();
 
     res.json({ success: true, message: 'Server deleted' });
   } catch (error) {
