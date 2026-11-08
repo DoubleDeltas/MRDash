@@ -290,20 +290,31 @@ function MinecraftServers() {
               </div>
 
               <div className="server-actions">
-                {(isAdmin || isOwner(server) || isManager(server)) && (
-                  <div
-                    className="action-button-wrapper"
-                    onMouseEnter={() => setHoveredButtonId(`monitoring-${server.id}`)}
-                    onMouseLeave={() => setHoveredButtonId(null)}
-                  >
-                    <button className="action-button" onClick={() => navigate(`/monitoring/${server.id}`)}>
-                      <span className="material-icons">monitor_heart</span>
-                    </button>
-                    {hoveredButtonId === `monitoring-${server.id}` && (
-                      <div className="action-tooltip">모니터링</div>
-                    )}
-                  </div>
-                )}
+                {(isAdmin || isOwner(server) || isManager(server)) && (() => {
+                  const hasDataSource = Boolean(server.monitoringDataSource)
+                  return (
+                    <div
+                      className="action-button-wrapper"
+                      onMouseEnter={() => setHoveredButtonId(`monitoring-${server.id}`)}
+                      onMouseLeave={() => setHoveredButtonId(null)}
+                    >
+                      <button
+                        className="action-button"
+                        onClick={() => navigate(`/monitoring/${server.id}`)}
+                        disabled={!hasDataSource}
+                      >
+                        <span className="material-icons">monitor_heart</span>
+                      </button>
+                      {hoveredButtonId === `monitoring-${server.id}` && (
+                        <div className="action-tooltip">
+                          {hasDataSource
+                            ? '모니터링'
+                            : '모니터링 데이터 소스가 연결되지 않아 모니터링 페이지로 이동할 수 없습니다.'}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {(isAdmin || isOwner(server) || isManager(server)) && (() => {
                   const agentConnected = agentStatuses[server.id] === true

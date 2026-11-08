@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { apiClient } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import GrafanaPanel from '../components/GrafanaPanel'
 import { GRAFANA_DASHBOARDS, grafanaPanelUrl, serverDatasourceUid } from '../components/grafana'
 import MonitoringRangeSelect, { DEFAULT_RANGE, resolveRange } from '../components/MonitoringRangeSelect'
@@ -16,6 +17,7 @@ const GRAFANA_DASHBOARD_BY_EXPORTER = {
 // 백엔드가 만들어 둔 그 서버 전용 데이터 소스(mrdash-server-<id>, backend/src/util/grafanaDatasources.js)를 쓴다.
 function ServerMonitoring() {
   const { serverId } = useParams()
+  const { user } = useAuth()
   const [server, setServer] = useState(null)
   const [loadError, setLoadError] = useState(false)
   const [rangeId, setRangeId] = useState(DEFAULT_RANGE)
@@ -45,6 +47,19 @@ function ServerMonitoring() {
         <div className="monitoring-status-card">
           <span className="material-icons">hourglass_empty</span>
           모니터링 데이터를 불러오는 중입니다...
+        </div>
+      </div>
+    )
+  }
+
+  // 콘솔과 같은 조건 — admin, 서버 소유자, 서버 관리자 (주소로 직접 들어와도 막는다)
+  const canView = user?.role === 'ADMIN' || server.ownerId === user?.id || Boolean(user && server.managerIds?.includes(user.id))
+  if (!canView) {
+    return (
+      <div className="monitoring-page">
+        <div className="monitoring-status-card monitoring-status-error">
+          <span className="material-icons">lock</span>
+          이 서버의 모니터링을 볼 권한이 없습니다. 서버 소유자나 관리자만 볼 수 있습니다.
         </div>
       </div>
     )
