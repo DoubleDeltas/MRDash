@@ -5,7 +5,15 @@
 const MINUTE = 60 * 1000
 const DAY = 24 * 60 * MINUTE
 
-const recent = (id, label, minutes) => ({ id, label, group: '최근', relative: `now-${minutes}m`, ms: minutes * MINUTE })
+// Grafana는 상대 시간의 숫자를 5자리까지만 해석하고, 넘으면 대시보드 기본 기간(10분)으로 돌아간다
+// (예: now-129600m). 나누어떨어지는 가장 큰 단위(일·시간·분)로 써서 숫자를 짧게 유지한다.
+const relativeFor = (minutes) => {
+  if (minutes % 1440 === 0) return `now-${minutes / 1440}d`
+  if (minutes % 60 === 0) return `now-${minutes / 60}h`
+  return `now-${minutes}m`
+}
+
+const recent = (id, label, minutes) => ({ id, label, group: '최근', relative: relativeFor(minutes), ms: minutes * MINUTE })
 
 // 현재 주기의 [시작, 끝] (끝은 다음 주기 시작 1ms 전)
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
