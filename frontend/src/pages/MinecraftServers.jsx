@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient, API_BASE_URL } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
@@ -49,7 +49,6 @@ function MinecraftServers() {
 
   const [servers, setServers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [statusesLoading, setStatusesLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [hoveredButtonId, setHoveredButtonId] = useState(null)
@@ -63,37 +62,46 @@ function MinecraftServers() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState(null)
 
+  // 새로고침이 겹쳤을 때 이전 요청의 늦은 응답이 최신 상태를 덮어쓰지 않도록 세대 번호로 구분한다
+  const loadGenerationRef = useRef(0)
+
+  // 서버별 상태를 각자 확인하고, 응답이 오는 대로 해당 카드만 갱신한다
+  const checkServerStatuses = (list, generation) => {
+    const isCurrent = () => loadGenerationRef.current === generation
+
+    const statusChecks = list.map(server =>
+      apiClient.get(`/servers/${server.id}/status`)
+        .then(res => res.data.data, () => ({ online: false }))
+        .then(status => {
+          if (isCurrent()) setStatuses(prev => ({ ...prev, [server.id]: status }))
+        })
+    )
+    const agentChecks = list.map(server =>
+      apiClient.get(`/servers/${server.id}/agent-status`)
+        .then(res => res.data.data.connected, () => false)
+        .then(connected => {
+          if (isCurrent()) setAgentStatuses(prev => ({ ...prev, [server.id]: connected }))
+        })
+    )
+    return Promise.allSettled([...statusChecks, ...agentChecks])
+  }
+
   const loadServers = async () => {
+    const generation = ++loadGenerationRef.current
     const res = await apiClient.get('/servers')
+    if (loadGenerationRef.current !== generation) return
     const list = res.data.data
     setServers(list)
-
-    const [statusResults, agentResults] = await Promise.all([
-      Promise.allSettled(list.map(server => apiClient.get(`/servers/${server.id}/status`))),
-      Promise.allSettled(list.map(server => apiClient.get(`/servers/${server.id}/agent-status`))),
-    ])
-
-    const newStatuses = {}
-    const newAgentStatuses = {}
-    list.forEach((server, i) => {
-      newStatuses[server.id] = statusResults[i].status === 'fulfilled'
-        ? statusResults[i].value.data.data
-        : { online: false }
-      newAgentStatuses[server.id] = agentResults[i].status === 'fulfilled'
-        ? agentResults[i].value.data.data.connected
-        : false
-    })
-    setStatuses(newStatuses)
-    setAgentStatuses(newAgentStatuses)
+    setStatuses({})
+    setAgentStatuses({})
+    setLoading(false)
+    await checkServerStatuses(list, generation)
   }
 
   useEffect(() => {
     loadServers()
       .catch(() => setError('서버 목록을 불러오지 못했습니다.'))
-      .finally(() => {
-        setLoading(false)
-        setStatusesLoading(false)
-      })
+      .finally(() => setLoading(false))
   }, [])
 
   const handleRefresh = async () => {
@@ -122,6 +130,7 @@ function MinecraftServers() {
     try {
       const res = await apiClient.post('/servers', form)
       setServers(prev => [...prev, res.data.data])
+      checkServerStatuses([res.data.data], loadGenerationRef.current)
       setForm(EMPTY_FORM)
       setShowForm(false)
     } catch (err) {
@@ -148,17 +157,6 @@ function MinecraftServers() {
 
   if (error) {
     return <div className="minecraft-servers"><p className="servers-message">{error}</p></div>
-  }
-
-  if (statusesLoading) {
-    return (
-      <div className="minecraft-servers">
-        <div className="servers-loading">
-          <div className="loading-spinner" />
-          <p className="servers-message">로딩 중...</p>
-        </div>
-      </div>
-    )
   }
 
   // 온라인인 서버를 위로, 같은 온라인/오프라인 그룹 내에서는 DB id 순서대로 정렬
@@ -243,7 +241,7 @@ function MinecraftServers() {
               <div className="server-status">
                 <div className="status-indicator">
                   <div
-                    className={`status-dot ${statuses[server.id]?.online ? 'open' : 'closed'}`}
+                    className={`status-dot ${!statuses[server.id] ? 'checking' : statuses[server.id].online ? 'open' : 'closed'}`}
                     onMouseEnter={() => setHoveredServerId(server.id)}
                     onMouseLeave={() => setHoveredServerId(null)}
                   >
@@ -266,7 +264,7 @@ function MinecraftServers() {
                       ? `${statuses[server.id].players.online}/${statuses[server.id].players.max}`
                       : statuses[server.id]
                         ? 'OFF'
-                        : ''}
+                        : '...'}
 
                     {hoveredPlayersId === server.id && statuses[server.id]?.online && (
                       <div className="player-list-tooltip">

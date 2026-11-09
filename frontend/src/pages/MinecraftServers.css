@@ -573,6 +573,21 @@
   background: #72767d;
 }
 
+.status-dot.checking {
+  background: #5865F2;
+  box-shadow: 0 0 8px rgba(88, 101, 242, 0.5);
+  animation: status-dot-blink 1s ease-in-out infinite;
+}
+
+@keyframes status-dot-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
 .status-tooltip {
   position: absolute;
   bottom: 100%;
