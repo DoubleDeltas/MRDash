@@ -171,12 +171,17 @@ function Monitoring() {
       {/* 그래프 — Grafana mrdash-host 대시보드의 패널 (grafana/dashboards/mrdash-host.json) */}
       <div className="monitoring-charts-grid">
         {(viewMode === 'total'
-          ? [['cpu', 'CPU 부하 (전체)'], ['memory', '사용 중인 메모리 (전체)']]
-          : [['containerCpu', 'CPU 부하 (컨테이너별 누적)'], ['containerMemory', '사용 중인 메모리 (컨테이너별 누적)']]
-        ).map(([panel, title]) => (
+          ? [['cpu', 'CPU 부하 (전체)'], ['memory', '사용 중인 메모리 (전체)'], ['network', '네트워크 트래픽 (전체)', true]]
+          : [
+              ['containerCpu', 'CPU 부하 (컨테이너별 누적)'],
+              ['containerMemory', '사용 중인 메모리 (컨테이너별 누적)'],
+              ['containerNetwork', '네트워크 트래픽 (컨테이너별 누적)', true],
+            ]
+        ).map(([panel, title, wide]) => (
           <GrafanaPanel
             key={panel}
             title={title}
+            wide={wide}
             src={grafanaPanelUrl(GRAFANA_DASHBOARDS.host, GRAFANA_DASHBOARDS.host.panels[panel], { range })}
           />
         ))}
