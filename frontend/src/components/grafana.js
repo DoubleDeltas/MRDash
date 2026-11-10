@@ -10,7 +10,7 @@ const MINECRAFT_PANELS = { players: 1, tps: 2, entities: 3, chunks: 4, heap: 5, 
 export const GRAFANA_DASHBOARDS = {
   host: {
     uid: 'mrdash-host',
-    panels: { cpu: 1, memory: 2, containerCpu: 3, containerMemory: 4 },
+    panels: { cpu: 1, memory: 2, containerCpu: 3, containerMemory: 4, network: 5, containerNetwork: 6 },
   },
   // PrometheusExporter 플러그인 (backend/src/util/exporterMetrics.js의 MINECRAFT_PROMETHEUS_EXPORTER)
   minecraft: {
