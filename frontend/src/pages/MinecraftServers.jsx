@@ -4,8 +4,19 @@ import { apiClient, API_BASE_URL } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { ServerFormFields, PLATFORM_LABELS, EMPTY_FORM, serverImageUrl } from '../components/ServerFormFields'
 import './MinecraftServers.css'
+import steveHead from '../assets/steve-head.png'
 
-const playerHeadUrl = (uuid) => `${API_BASE_URL}/players/${uuid}/head`
+// 닉네임도 넘긴다 — 오프라인 모드 서버의 UUID는 Mojang에 없어서 백엔드가 닉네임으로 정품 계정을 찾는다
+const playerHeadUrl = (uuid, name) => `${API_BASE_URL}/players/${uuid}/head?${new URLSearchParams({ name })}`
+
+// 머리를 못 가져오면(정품이 아닌 닉네임, Mojang 오류 등) 깨진 아이콘 대신 기본 머리(Steve)로
+// (기본 머리마저 실패해도 다시 바꾸지 않게 한 번만)
+const showDefaultHead = (e) => {
+  const img = e.currentTarget
+  if (img.dataset.defaultHead) return
+  img.dataset.defaultHead = 'true'
+  img.src = steveHead
+}
 
 // 배경색 밝기에 따라 검정/흰색 중 더 잘 보이는 글자색을 고른다 (YIQ luma)
 const getContrastTextColor = (hexColor) => {
@@ -271,7 +282,12 @@ function MinecraftServers() {
                         {statuses[server.id].players.sample?.length > 0 ? (
                           statuses[server.id].players.sample.map(player => (
                             <div key={player.id} className="player-list-row">
-                              <img className="player-list-avatar" src={playerHeadUrl(player.id)} alt={player.name} />
+                              <img
+                                className="player-list-avatar"
+                                src={playerHeadUrl(player.id, player.name)}
+                                alt={player.name}
+                                onError={showDefaultHead}
+                              />
                               <span className="player-list-name">{player.name}</span>
                             </div>
                           ))
