@@ -77,6 +77,7 @@ frontend:
 - **멤버 인증**: "마랜디" 서버 멤버면 `User.isMrdAuthorized = true`(계정 없으면 생성), 나가면 `false`. 입장/퇴장 이벤트 즉시 반영 + 주기적 전체 동기화.
 - backend의 `/internal` API(`PUT /internal/members`, `GET|PUT|DELETE /internal/members/:discordId`)를 `Authorization: Bearer <INTERNAL_API_SECRET>`으로 호출. `/internal`은 `/api` 밖이라 공용 nginx로 노출되지 않음.
 - **알림 채널 목록** (`modules/channels`): 봇이 볼 수 있고 메시지를 보낼 수 있는 텍스트 채널 목록을 시작 시·채널/역할 변경 시·10분마다 `PUT /internal/discord-channels`로 보낸다. backend는 Redis(`mrdash:discord-channels`)에 보관하고, 서버별 모니터링 알림 설정(`/settings/alert/:serverId`)의 "마랜디 채널" 목록으로 쓴다.
+- MRDash Prometheus는 `READONLY_API_SECRET`으로 `GET /internal/prometheus/targets`(http_sd, 서버 설정에서 "수집 대상 자동 등록"을 켠 서버 목록)를 읽는다 — 설정은 `grafana/README.md` 5절.
 - 마랜디위키는 `READONLY_API_SECRET`으로 `GET /internal/members/:discordId`(인증 여부 조회)만 호출한다 (`ddeltas-net`에서 `mrdash-backend:3000`에 직접 접근). 읽기 전용 시크릿으로 쓰기 요청 시 403.
 - 기능은 `src/modules/<이름>/`에 `{ name, register(client) }` 형태로 만들고 `src/index.js`의 `modules`에 추가.
 - 환경변수: backend와 같은 서버의 `.env` 하나를 공유 (`.env.example`의 discord-bot 항목 참고). `BACKEND_INTERNAL_URL`은 기본값이 운영(`NODE_ENV=production`)이면 `http://mrdash-backend:3000/internal`, 로컬이면 `http://localhost:$PORT/internal`이라 보통 생략. Developer Portal에서 **Server Members Intent** 활성화 필요.

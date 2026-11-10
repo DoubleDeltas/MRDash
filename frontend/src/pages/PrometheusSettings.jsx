@@ -12,7 +12,16 @@ const EXPORTERS = [
     detail: 'sladkoff/minecraft-prometheus-exporter',
     url: 'https://github.com/sladkoff/minecraft-prometheus-exporter',
   },
+  {
+    value: 'PROMETHEUS_EXPORTER_MOD',
+    label: 'Prometheus Exporter 모드',
+    detail: 'cpburnz/minecraft-prometheus-exporter · Forge 26.2는 DoubleDeltas 포크',
+    url: 'https://github.com/DoubleDeltas/minecraft-prometheus-exporter',
+  },
 ]
+
+// 수집 대상 자동 등록 주소 — backend MinecraftServerController의 HOST_PORT와 같은 규칙 (input pattern은 전체 일치)
+const HOST_PORT_PATTERN = String.raw`[A-Za-z0-9._\-]+:\d{1,5}|\[[0-9A-Fa-f:.]+\]:\d{1,5}`
 
 // 연결 대상: MRDash 백엔드의 Prometheus(PROMETHEUS_URL) 또는 URL을 직접 입력한 외부 Prometheus.
 // MRDash로 저장하면 prometheusUrl/Token이 null로 저장된다.
@@ -40,6 +49,8 @@ function PrometheusSettings() {
   const [job, setJob] = useState('')
   const [instance, setInstance] = useState('')
   const [exporter, setExporter] = useState(null)
+  // MRDash Prometheus에 Targets를 수집 대상으로 자동 등록 (MRDash Prometheus일 때만)
+  const [autoScrape, setAutoScrape] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   // 연결 테스트 결과: 'idle'(검은 램프) | 'testing' | 'success'(초록) | 'fail'(빨강, 아래에 원인 표시)
@@ -58,6 +69,7 @@ function PrometheusSettings() {
         setJob(s.prometheusJob || '')
         setInstance(s.prometheusInstance || '')
         setExporter(s.prometheusExporter || null)
+        setAutoScrape(Boolean(s.prometheusAutoScrape))
       })
       .catch(() => setLoadError('서버 정보를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
@@ -67,7 +79,7 @@ function PrometheusSettings() {
   useEffect(() => {
     setTestState('idle')
     setTestReason(null)
-  }, [target, url, token, clearToken, job, instance, exporter])
+  }, [target, url, token, clearToken, job, instance, exporter, autoScrape])
 
   // 저장 전 폼 값 그대로 테스트한다 (토큰 칸이 비어 있으면 저장된 토큰 사용)
   const handleTest = async () => {
@@ -92,6 +104,7 @@ function PrometheusSettings() {
         job: job.trim(),
         instance: instance.trim() || null,
         exporter,
+        autoScrape: scrapeEnabled,
       })
       if (res.data.data.ok) {
         setTestState('success')
@@ -126,6 +139,7 @@ function PrometheusSettings() {
         job: job.trim(),
         instance: instance.trim() || null,
         exporter,
+        autoScrape: scrapeEnabled,
       })
       navigate(`/settings/${server.id}`)
     } catch (err) {
@@ -134,6 +148,8 @@ function PrometheusSettings() {
       setSubmitting(false)
     }
   }
+
+  const scrapeEnabled = target === 'MRDASH' && autoScrape
 
   if (loading) {
     return (
@@ -181,6 +197,18 @@ function PrometheusSettings() {
                 {option.label}
               </label>
             ))}
+            {/* MRDash Prometheus를 고르면 수집 대상 자동 등록을 켤 수 있다 (backend /internal/prometheus/targets) */}
+            {target === 'MRDASH' && (
+              <label className="server-form-manager-item prometheus-auto-scrape">
+                <input
+                  type="checkbox"
+                  checked={autoScrape}
+                  onChange={(e) => setAutoScrape(e.target.checked)}
+                />
+                수집 대상 자동 등록
+                <span className="radio-option-detail">(Prometheus에 직접 설정하지 않아도 Targets 주소를 수집)</span>
+              </label>
+            )}
             {/* 외부 Prometheus가 목록의 마지막 항목이라 그 바로 아래, 같은 상자 안에 둔다 */}
             {target === 'EXTERNAL' && (
               <div className="prometheus-external-fields">
@@ -236,18 +264,29 @@ function PrometheusSettings() {
             placeholder="minecraft"
             required
           />
-          <p className="server-form-hint">Prometheus 설정(scrape_configs)의 job_name</p>
+          <p className="server-form-hint">
+            {scrapeEnabled
+              ? '자동 등록된 수집 대상의 job 라벨 — 여러 서버가 같은 이름을 써도 된다'
+              : 'Prometheus 설정(scrape_configs)의 job_name'}
+          </p>
         </div>
 
         <div className="server-form-row">
-          <label htmlFor="prometheus-instance">Targets (선택)</label>
+          <label htmlFor="prometheus-instance">{scrapeEnabled ? 'Targets' : 'Targets (선택)'}</label>
           <input
             id="prometheus-instance"
             value={instance}
             onChange={(e) => setInstance(e.target.value)}
-            placeholder="mc-survival:9940"
+            placeholder={exporter === 'PROMETHEUS_EXPORTER_MOD' ? 'mc-survival:19565' : 'mc-survival:9940'}
+            required={scrapeEnabled}
+            pattern={scrapeEnabled ? HOST_PORT_PATTERN : undefined}
+            title={scrapeEnabled ? 'host:port 형식 (예: mc-survival:19565)' : undefined}
           />
-          <p className="server-form-hint">한 job에 서버가 여러 개라면 이 서버의 target(instance)을 입력</p>
+          <p className="server-form-hint">
+            {scrapeEnabled
+              ? 'Prometheus가 접속할 Exporter 주소(host:port) — Prometheus 컨테이너에서 닿는 주소여야 한다'
+              : '한 job에 서버가 여러 개라면 이 서버의 target(instance)을 입력'}
+          </p>
         </div>
 
         <div className="server-form-row">

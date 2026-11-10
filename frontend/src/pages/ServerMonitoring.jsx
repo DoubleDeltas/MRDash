@@ -10,9 +10,10 @@ import './Monitoring.css'
 // Exporter별 Grafana 대시보드
 const GRAFANA_DASHBOARD_BY_EXPORTER = {
   MINECRAFT_PROMETHEUS_EXPORTER: GRAFANA_DASHBOARDS.minecraft,
+  PROMETHEUS_EXPORTER_MOD: GRAFANA_DASHBOARDS.minecraftMod,
 }
 
-// 서버별 모니터링 — Grafana 패널(grafana/dashboards/mrdash-minecraft.json)로 그린다.
+// 서버별 모니터링 — Exporter에 맞는 Grafana 대시보드(grafana/dashboards/mrdash-minecraft*.json)의 패널로 그린다.
 // MRDash Prometheus를 쓰는 서버는 Grafana의 기본 Prometheus 데이터 소스를, 외부 Prometheus를 쓰는 서버는
 // 백엔드가 만들어 둔 그 서버 전용 데이터 소스(mrdash-server-<id>, backend/src/util/grafanaDatasources.js)를 쓴다.
 function ServerMonitoring() {
