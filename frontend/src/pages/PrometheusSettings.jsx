@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { Fragment, useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
@@ -186,29 +186,31 @@ function PrometheusSettings() {
           <label>Prometheus</label>
           <div className="radio-options">
             {TARGETS.map(option => (
-              <label key={option.value} className="radio-option">
-                <input
-                  type="radio"
-                  name="target"
-                  value={option.value}
-                  checked={target === option.value}
-                  onChange={() => setTarget(option.value)}
-                />
-                {option.label}
-              </label>
+              <Fragment key={option.value}>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="target"
+                    value={option.value}
+                    checked={target === option.value}
+                    onChange={() => setTarget(option.value)}
+                  />
+                  {option.label}
+                </label>
+                {/* MRDash Prometheus를 고르면 그 바로 아래에서 수집 대상 자동 등록을 켤 수 있다 (backend /internal/prometheus/targets) */}
+                {option.value === 'MRDASH' && target === 'MRDASH' && (
+                  <label className="server-form-manager-item prometheus-auto-scrape">
+                    <input
+                      type="checkbox"
+                      checked={autoScrape}
+                      onChange={(e) => setAutoScrape(e.target.checked)}
+                    />
+                    수집 대상 자동 등록
+                    <span className="radio-option-detail">(Prometheus에 직접 설정하지 않아도 Targets 주소를 수집)</span>
+                  </label>
+                )}
+              </Fragment>
             ))}
-            {/* MRDash Prometheus를 고르면 수집 대상 자동 등록을 켤 수 있다 (backend /internal/prometheus/targets) */}
-            {target === 'MRDASH' && (
-              <label className="server-form-manager-item prometheus-auto-scrape">
-                <input
-                  type="checkbox"
-                  checked={autoScrape}
-                  onChange={(e) => setAutoScrape(e.target.checked)}
-                />
-                수집 대상 자동 등록
-                <span className="radio-option-detail">(Prometheus에 직접 설정하지 않아도 Targets 주소를 수집)</span>
-              </label>
-            )}
             {/* 외부 Prometheus가 목록의 마지막 항목이라 그 바로 아래, 같은 상자 안에 둔다 */}
             {target === 'EXTERNAL' && (
               <div className="prometheus-external-fields">
