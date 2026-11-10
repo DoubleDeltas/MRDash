@@ -6,6 +6,7 @@ import Monitoring from "./pages/Monitoring";
 import Wiki from "./pages/Wiki";
 import Main from "./pages/Main";
 import UserManagement from "./pages/UserManagement";
+import AdminSettings from "./pages/AdminSettings";
 import RequireAdmin from "./auth/RequireAdmin";
 
 const material = (code) => {
@@ -41,6 +42,14 @@ export const pages = [
         path: '/wiki',
         external: true,
         element: <Wiki />
+    },
+    {
+        id: 'admin',
+        title: 'MRDash 관리',
+        icon: material("admin_panel_settings"),
+        path: '/admin',
+        adminOnly: true,
+        element: <RequireAdmin><AdminSettings /></RequireAdmin>,
     },
     {
         id: 'users',
