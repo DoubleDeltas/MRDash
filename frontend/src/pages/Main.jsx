@@ -1,61 +1,30 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { apiClient } from '../api/client'
+import NoticeCard from '../components/NoticeCard'
 import './Main.css'
 
 function Main() {
-  const [notices] = useState([
-    {
-      id: 1,
-      title: '마랜디 대시보드 오픈',
-      content: '마랜디 커뮤니티 통합 관리 대시보드가 새롭게 오픈되었습니다. 앞으로 다양한 서비스를 한곳에서 관리할 수 있습니다.',
-      date: '2026-05-25',
-      category: '공지'
-    },
-    {
-      id: 2,
-      title: '마인크래프트 서버 점검 예정',
-      content: '초보자 서버의 업그레이드로 인해 5월 30일 오후 2시부터 4시까지 점검이 예정되어 있습니다. 이용에 불편을 드려 죄송합니다.',
-      date: '2026-05-24',
-      category: '공지'
-    },
-    {
-      id: 3,
-      title: '마랜디위키 업데이트 완료',
-      content: '마랜디위키에 새로운 섹션이 추가되었습니다. 커뮤니티 가이드 및 자주 묻는 질문 섹션을 확인해보세요.',
-      date: '2026-05-23',
-      category: '업데이트'
-    }
-  ])
+  // 공지는 관리 페이지(/admin)에서 ADMIN이 작성한다 — GET /notices는 로그인 없이도 볼 수 있다
+  const [notices, setNotices] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case '공지':
-        return '#7289DA'
-      case '업데이트':
-        return '#43B581'
-      default:
-        return '#72767d'
-    }
-  }
+  useEffect(() => {
+    apiClient.get('/notices')
+      .then(res => setNotices(res.data.data))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }, [])
 
   return (
     <div className="main-page">
       <section className="notices-section">
         <h2>📢 공지사항</h2>
         <div className="notices-list">
-          {notices.map(notice => (
-            <article key={notice.id} className="notice-card">
-              <div className="notice-header">
-                <h3 className="notice-title">{notice.title}</h3>
-                <span className="notice-category" style={{ backgroundColor: getCategoryColor(notice.category) }}>
-                  {notice.category}
-                </span>
-              </div>
-              <p className="notice-content">{notice.content}</p>
-              <div className="notice-footer">
-                <time className="notice-date">{notice.date}</time>
-              </div>
-            </article>
-          ))}
+          {loading && <p className="notices-message">불러오는 중...</p>}
+          {!loading && error && <p className="notices-message">공지사항을 불러오지 못했습니다.</p>}
+          {!loading && !error && notices.length === 0 && <p className="notices-message">등록된 공지사항이 없습니다.</p>}
+          {notices.map(notice => <NoticeCard key={notice.id} notice={notice} />)}
         </div>
       </section>
 

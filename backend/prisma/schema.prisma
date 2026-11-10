@@ -21,17 +21,18 @@ enum UserRole {
 }
 
 model User {
-  id              String        @id @default(uuid())
+  id              String            @id @default(uuid())
   provider        AuthProvider
   providerId      String
   localPwHash     String?
   avatarUrl       String?
   handle          String?
   nickname        String?
-  role            UserRole      @default(USER)
-  isMrdAuthorized Boolean       @default(false)
+  role            UserRole          @default(USER)
+  isMrdAuthorized Boolean           @default(false)
   ownedServers    MinecraftServer[]
   managedServers  MinecraftServer[] @relation("ServerManagers")
+  notices         Notice[]
 
   @@unique([provider, providerId], name: "provider_user_unique")
 }
@@ -153,4 +154,24 @@ model MonitoringAlertWebhook {
   url     String          @db.VarChar(512)
 
   @@unique([alertId, url])
+}
+
+enum NoticeCategory {
+  NOTICE // 공지
+  UPDATE // 업데이트
+}
+
+// 메인 페이지 공지사항 — /admin에서 ADMIN이 작성한다. 화면 표시 이름·색은 frontend/src/components/NoticeCard.jsx
+model Notice {
+  id        Int            @id @default(autoincrement())
+  title     String         @db.VarChar(100)
+  content   String         @db.Text
+  category  NoticeCategory @default(NOTICE)
+  // 작성자 기록용 (화면에는 보이지 않는다) — 작성자가 탈퇴해도 공지는 남긴다
+  authorId  String?
+  author    User?          @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([createdAt])
 }
