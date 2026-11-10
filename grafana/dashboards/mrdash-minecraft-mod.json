@@ -1,0 +1,634 @@
+{
+  "uid": "mrdash-minecraft-mod",
+  "title": "MRDash Minecraft 서버 (Prometheus Exporter 모드)",
+  "description": "MRDash /monitoring/:serverId 페이지에 패널 단위로 들어가는 대시보드 — Exporter가 Prometheus Exporter 모드(cpburnz/minecraft-prometheus-exporter)인 서버용. 서버 설정의 Job Name·Targets가 var-job·var-instance로 넘어온다. 식은 backend/src/util/exporterMetrics.js의 PROMETHEUS_EXPORTER_MOD와 같다 (TPS만 대시보드는 $__rate_interval). 패널 id는 mrdash-minecraft.json과 같다.",
+  "tags": [
+    "mrdash"
+  ],
+  "editable": false,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-10m",
+    "to": "now"
+  },
+  "refresh": "15s",
+  "timezone": "browser",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "refresh": 1,
+        "options": []
+      },
+      {
+        "name": "job",
+        "label": "Job",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(up, job)",
+          "refId": "job-query"
+        },
+        "definition": "label_values(up, job)",
+        "refresh": 2,
+        "sort": 1,
+        "hide": 0,
+        "current": {},
+        "options": [],
+        "includeAll": false,
+        "multi": false
+      },
+      {
+        "name": "instance",
+        "label": "Targets",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(up{job=\"$job\"}, instance)",
+          "refId": "instance-query"
+        },
+        "definition": "label_values(up{job=\"$job\"}, instance)",
+        "refresh": 2,
+        "sort": 1,
+        "hide": 0,
+        "current": {},
+        "options": [],
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".*"
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 6,
+      "type": "state-timeline",
+      "title": "서버 상태",
+      "description": "Prometheus가 Prometheus Exporter 모드에서 지표를 가져왔는지 (up). 서버가 꺼지면 모드도 멈춰 OFF가 된다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#898781"
+          },
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "OFF",
+                  "color": "#e34948",
+                  "index": 1
+                },
+                "1": {
+                  "text": "ON",
+                  "color": "#1baf7a",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 0.5,
+                "to": null,
+                "result": {
+                  "text": "ON",
+                  "color": "#1baf7a",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": null,
+                "to": 0.5,
+                "result": {
+                  "text": "OFF",
+                  "color": "#e34948",
+                  "index": 3
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#898781",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "auto",
+        "mergeValues": true,
+        "alignValue": "center",
+        "rowHeight": 0.8,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max(up{job=\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "서버"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "접속자 수",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#3987e5"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count(mc_player_list{job=\"$job\", instance=~\"$instance\"}) or (max(up{job=\"$job\", instance=~\"$instance\"}) * 0)",
+          "legendFormat": "접속자"
+        }
+      ],
+      "description": "mc_player_list 시계열 수 (접속한 플레이어마다 하나)"
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "TPS",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 19,
+            "axisSoftMax": 20.1,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#c98500"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "#c98500",
+                "value": 20
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "avg(clamp_max(rate(mc_server_tick_seconds_count{job=\"$job\", instance=~\"$instance\"}[$__rate_interval]) / rate(mc_server_tick_seconds_sum{job=\"$job\", instance=~\"$instance\"}[$__rate_interval]), 20))",
+          "legendFormat": "TPS"
+        }
+      ],
+      "description": "min(20, 1 / 평균 틱 시간) — mc_server_tick_seconds 히스토그램으로 계산. 빈 서버가 틱을 멈추면(pause-when-empty-seconds) 비어 보인다"
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "엔티티 수",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d55181"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(mc_entities_total{job=\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "엔티티"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "로드된 청크 수",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#9085e9"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(mc_dimension_chunks_loaded{job=\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "청크"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "힙 메모리",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "JVM 힙 — 사용(jvm_memory_bytes_used), 할당(committed), 최대 = -Xmx (area=\"heap\")",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#199e70"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "할당"
+            },
+            "properties": [
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    4
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#898781"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "최대"
+            },
+            "properties": [
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    4
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#e34948"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(jvm_memory_bytes_used{job=\"$job\", instance=~\"$instance\", area=\"heap\"})",
+          "legendFormat": "사용"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(jvm_memory_bytes_committed{job=\"$job\", instance=~\"$instance\", area=\"heap\"})",
+          "legendFormat": "할당"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max(jvm_memory_bytes_max{job=\"$job\", instance=~\"$instance\", area=\"heap\"})",
+          "legendFormat": "최대"
+        }
+      ]
+    }
+  ]
+}

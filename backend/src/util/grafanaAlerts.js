@@ -1,5 +1,5 @@
 import { prisma } from '../config/prisma.js';
-import { EXPORTER_METRICS } from './exporterMetrics.js';
+import { resolveAlertMetric } from './exporterMetrics.js';
 import { grafanaApi, isGrafanaApiConfigured } from './grafanaApi.js';
 import { buildSelector } from './prometheus.js';
 import { serverDatasourceUid, syncAllServerDatasources } from './grafanaDatasources.js';
@@ -70,17 +70,8 @@ const contactPointUidPrefix = (serverId) => `mrdash-s${serverId}-`;
 
 const OP_SYMBOLS = { GT: '>', LT: '<', GTE: '>=', LTE: '<=', NEQ: '!=', EQ: '==' };
 
-// 지표 → 월드·종류별 시계열을 하나로 합치는 방법 (exporterMetrics 표 + 공통 지표 up)
-const AGGREGATES = Object.fromEntries([
-  ...Object.values(EXPORTER_METRICS).flatMap((e) => Object.values(e.metrics).map((m) => [m.metric, m.aggregate])),
-  ['up', 'max'],
-]);
-const METRIC_LABELS = Object.fromEntries([
-  ...Object.values(EXPORTER_METRICS).flatMap((e) => Object.values(e.metrics).map((m) => [m.metric, m.label])),
-  ['up', '서버 상태'],
-]);
-
-const ruleSummary = (rule) => `${METRIC_LABELS[rule.key] ?? rule.key} ${OP_SYMBOLS[rule.op]} ${rule.threshold}`;
+// 규칙 → 비교식 요약 ("TPS < 15") — 지표 이름은 서버의 Exporter 기준 (exporterMetrics.js)
+const ruleSummary = (exporter, rule) => `${resolveAlertMetric(exporter, rule.key, '').label} ${OP_SYMBOLS[rule.op]} ${rule.threshold}`;
 
 const EXPR_DATASOURCE = { type: '__expr__', uid: '__expr__' };
 
@@ -90,9 +81,11 @@ const toGrafanaRule = (server, rule, index, defaultUid) => {
   const prometheus = server.monitoringDataSource.prometheus;
   const selector = buildSelector(prometheus.job, prometheus.instance);
   const datasourceUid = prometheus.url ? serverDatasourceUid(server.id) : defaultUid;
+  const { expr } = resolveAlertMetric(prometheus.exporter, rule.key, selector);
+  const summary = ruleSummary(prometheus.exporter, rule);
   return {
     uid: `${contactPointUidPrefix(server.id)}r${index}`,
-    title: `서버 ${server.id} · ${ruleSummary(rule)} (#${index + 1})`,
+    title: `서버 ${server.id} · ${summary} (#${index + 1})`,
     folderUID: FOLDER_UID,
     ruleGroup: `${RULE_GROUP_PREFIX}${server.id}`,
     condition: 'C',
@@ -103,7 +96,7 @@ const toGrafanaRule = (server, rule, index, defaultUid) => {
         relativeTimeRange: { from: 300, to: 0 },
         model: {
           refId: 'A',
-          expr: `${AGGREGATES[rule.key] ?? 'max'}(${rule.key}{${selector}})`,
+          expr,
           range: true,
           instant: false,
           intervalMs: 15000,
@@ -136,7 +129,7 @@ const toGrafanaRule = (server, rule, index, defaultUid) => {
     noDataState: rule.key === 'up' ? 'Alerting' : 'OK',
     execErrState: 'Error',
     labels: { [ALERT_LABELS.serverId]: String(server.id) },
-    annotations: { summary: ruleSummary(rule), server: server.name },
+    annotations: { summary, server: server.name },
     isPaused: false,
   };
 };
@@ -193,7 +186,7 @@ const loadServers = () => prisma.minecraftServer.findMany({
   select: {
     id: true,
     name: true,
-    monitoringDataSource: { select: { type: true, prometheus: { select: { url: true, job: true, instance: true } } } },
+    monitoringDataSource: { select: { type: true, prometheus: { select: { url: true, job: true, instance: true, exporter: true } } } },
     monitoringAlert: {
       select: {
         rules: { orderBy: { id: 'asc' } },

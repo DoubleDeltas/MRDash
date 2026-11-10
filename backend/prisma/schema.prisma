@@ -49,7 +49,8 @@ enum MonitoringDataSourceType {
 }
 
 enum PrometheusExporter {
-  MINECRAFT_PROMETHEUS_EXPORTER
+  MINECRAFT_PROMETHEUS_EXPORTER // sladkoff/minecraft-prometheus-exporter (Bukkit/Paper 플러그인)
+  PROMETHEUS_EXPORTER_MOD // cpburnz/minecraft-prometheus-exporter (Forge/NeoForge/Fabric 모드)
 }
 
 // 알림 규칙의 비교 연산자 (Prisma enum 값은 식별자만 가능해서 이름으로 둔다)
@@ -104,6 +105,8 @@ model PrometheusDataSource {
   job          String?
   instance     String?
   exporter     PrometheusExporter?
+  // MRDash Prometheus(url null)에 instance(host:port)를 수집 대상으로 자동 등록 — GET /internal/prometheus/targets (http_sd)
+  autoScrape   Boolean              @default(false)
 }
 
 // 서버의 모니터링 알림 설정 (서버당 하나) — 규칙 중 하나라도 맞으면 연결된 디스코드 채널·웹후크로 알림을 보낸다

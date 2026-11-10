@@ -69,11 +69,12 @@ curl -s -u admin:<관리자 비밀번호> -H 'Content-Type: application/json'   
 | 파일 | UID | 쓰는 곳 | 변수 |
 |---|---|---|---|
 | `dashboards/mrdash-host.json` | `mrdash-host` | `/monitoring` | `datasource` |
-| `dashboards/mrdash-minecraft.json` | `mrdash-minecraft` | `/monitoring/:serverId` | `datasource`, `job`, `instance` |
+| `dashboards/mrdash-minecraft.json` | `mrdash-minecraft` | `/monitoring/:serverId` (Exporter: PrometheusExporter 플러그인) | `datasource`, `job`, `instance` |
+| `dashboards/mrdash-minecraft-mod.json` | `mrdash-minecraft-mod` | `/monitoring/:serverId` (Exporter: Prometheus Exporter 모드) | `datasource`, `job`, `instance` |
 
 프로비저닝(`provisioning/dashboards/mrdash.yaml`)으로 불러오며 Grafana UI에서는 수정할 수 없다(`allowUiUpdates: false`).
 패널을 바꾸려면 JSON을 고치고 컨테이너가 다시 읽게 둔다(60초마다 확인).
-패널 id는 `frontend/src/components/grafana.js`의 값과 맞아야 한다.
+패널 id는 `frontend/src/components/grafana.js`의 값과 맞아야 한다 (두 Minecraft 대시보드는 패널 id가 같다).
 
 ## 4. 모니터링 알림 (Grafana Alerting)
 
@@ -94,3 +95,36 @@ curl -s -u admin:<관리자 비밀번호> -H 'Content-Type: application/json'   
   `GRAFANA_ALERT_WEBHOOK_SECRET`이 비어 있으면 봇 채널 연동은 만들지 않는다.
 - **API**: 기존 `/api/v1/provisioning` API를 쓴다 (Grafana 13에서 지원 중단 예정이지만 계속 동작). 호출은 `backend/src/util/grafanaApi.js`를 거친다.
 - API로 만든 경보 설정은 Grafana UI에서 수정할 수 없다 (provenance). 원본은 MRDash다.
+
+## 5. MRDash Prometheus 수집 대상 자동 등록
+
+서버의 Prometheus 연결 설정에서 **MRDash Prometheus**를 고르고 **수집 대상 자동 등록**을 켜면,
+그 서버의 Targets(host:port)를 MRDash Prometheus가 직접 수집한다 — 서버마다 `prometheus.yml`을 고칠 필요가 없다.
+
+backend가 Prometheus [HTTP 서비스 디스커버리](https://prometheus.io/docs/prometheus/latest/http_sd/) 형식으로
+목록을 내준다: `GET /internal/prometheus/targets` (`backend/src/controllers/PrometheusTargetsController.js`).
+
+```json
+[{ "targets": ["mc-survival:19565"], "labels": { "job": "minecraft", "mrdash_server_id": "3", "__metrics_path__": "/metrics" } }]
+```
+
+MRDash Prometheus(외부 compose, `ddeltas-net`)의 `prometheus.yml`에 **한 번만** 추가한다:
+
+```yaml
+scrape_configs:
+  - job_name: mrdash               # 실제 job 라벨은 서버 설정의 Job Name으로 덮어써진다
+    scrape_interval: 15s           # 30초 이하 (Prometheus Exporter 모드의 TPS가 [1m] 구간으로 계산된다)
+    http_sd_configs:
+      - url: http://mrdash-backend:3000/internal/prometheus/targets
+        refresh_interval: 1m
+        authorization:
+          credentials_file: /etc/prometheus/mrdash-readonly-secret   # 내용: READONLY_API_SECRET 값
+```
+
+- 인증은 `/internal` 공통 시크릿 — 조회만 하므로 `READONLY_API_SECRET`을 쓴다 (`INTERNAL_API_SECRET`도 동작).
+- `/internal`은 공용 nginx로 노출되지 않으므로 Prometheus가 `ddeltas-net`에서 `mrdash-backend:3000`에 직접 닿아야 한다.
+- Targets 주소는 **Prometheus 컨테이너에서** 닿는 주소여야 한다 (같은 docker 네트워크면 컨테이너 이름, 아니면 호스트 IP).
+- 설정을 저장하면 Prometheus가 다음 `refresh_interval`(위 예시는 1분) 안에 목록을 다시 읽는다. 그 전의 연결 테스트는 "아직 수집 대상이 없다"고 나온다.
+- 외부 Prometheus를 쓰는 서버, Targets가 없는 서버는 목록에 넣지 않는다. 같은 Job Name·Targets를 두 서버가 자동 등록할 수는 없다(저장 시 409).
+- **기존에 `prometheus.yml`에 직접 적어 둔 서버에 자동 등록을 켜면 같은 대상을 두 번 수집**하므로, 켠 뒤에는 직접 적은 항목을 지운다.
+- backend가 응답하지 못하면(500·접속 실패) Prometheus는 마지막으로 받은 목록을 계속 쓴다.

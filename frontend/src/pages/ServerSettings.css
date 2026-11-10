@@ -271,3 +271,16 @@
     flex: 1;
   }
 }
+
+/* MRDash Prometheus 라디오 아래의 "수집 대상 자동 등록" 체크박스 — 라디오 글자 위치에 맞춰 들여쓴다 */
+.prometheus-auto-scrape {
+  margin-left: 1.5rem;
+}
+
+.prometheus-auto-scrape input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: #7289DA;
+  cursor: pointer;
+}

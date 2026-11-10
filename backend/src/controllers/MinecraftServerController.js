@@ -23,6 +23,7 @@ const toPublicServer = ({ image, consoleToken, managers, monitoringDataSource, m
     prometheusJob: prometheus?.job ?? null,
     prometheusInstance: prometheus?.instance ?? null,
     prometheusExporter: prometheus?.exporter ?? null,
+    prometheusAutoScrape: prometheus?.autoScrape ?? false,
     hasPrometheusToken: prometheus?.token != null,
     // 서버 설정의 "모니터링 알림 설정" 문구용 개수 — 알림 설정이 없으면 null
     alertSummary: monitoringAlert?._count ?? null,
@@ -166,10 +167,14 @@ export const issueConsoleToken = async (req, res) => {
   }
 };
 
-// Prometheus 연결 정보(target/url/token/job/instance) 검증 — 연결 저장과 연결 테스트가 같이 쓴다.
+// 자동 등록 Targets: Prometheus가 그대로 접속할 host:port (http_sd의 targets 값)
+const HOST_PORT = /^[A-Za-z0-9._-]+:\d{1,5}$|^\[[0-9A-Fa-f:.]+\]:\d{1,5}$/;
+
+// Prometheus 연결 정보(target/url/token/job/instance/autoScrape) 검증 — 연결 저장과 연결 테스트가 같이 쓴다.
 // target이 MRDASH면 백엔드의 PROMETHEUS_URL을 쓰므로 url/token을 비우고(url null = MRDash Prometheus),
 // EXTERNAL이면 외부 Prometheus의 url과 (선택) 인증 토큰을 받는다.
-const parsePrometheusSettings = ({ target, url, token, clearToken, job, instance }) => {
+// autoScrape는 MRDash Prometheus일 때만 — instance(host:port)를 수집 대상으로 자동 등록한다 (PrometheusTargetsController).
+const parsePrometheusSettings = ({ target, url, token, clearToken, job, instance, autoScrape }) => {
   if (target !== 'MRDASH' && target !== 'EXTERNAL') {
     return { error: 'target must be one of: MRDASH, EXTERNAL' };
   }
@@ -187,13 +192,19 @@ const parsePrometheusSettings = ({ target, url, token, clearToken, job, instance
   if (instance != null && typeof instance !== 'string') {
     return { error: 'instance must be a string' };
   }
+  const trimmedInstance = instance?.trim() || null;
+  const scrape = target === 'MRDASH' && autoScrape === true;
+  if (scrape && !HOST_PORT.test(trimmedInstance ?? '')) {
+    return { error: '수집 대상 자동 등록을 쓰려면 Targets에 host:port 형식의 주소를 입력해주세요.' };
+  }
   return {
     target,
     url: target === 'EXTERNAL' ? trimmedUrl : null,
     token: token?.trim() || null,
     clearToken: Boolean(clearToken),
     job: trimmedJob,
-    instance: instance?.trim() || null,
+    instance: trimmedInstance,
+    autoScrape: scrape,
   };
 };
 
@@ -221,11 +232,32 @@ export const connectMonitoringDataSource = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Server not found' });
     }
 
+    // 같은 job·instance를 두 서버가 자동 등록하면 같은 시계열을 두 번 수집하게 된다
+    if (settings.autoScrape) {
+      const duplicate = await prisma.prometheusDataSource.findFirst({
+        where: {
+          autoScrape: true,
+          url: null,
+          job: settings.job,
+          instance: settings.instance,
+          dataSource: { serverId: { not: serverId } },
+        },
+        select: { dataSource: { select: { server: { select: { name: true } } } } },
+      });
+      if (duplicate) {
+        return res.status(409).json({
+          success: false,
+          error: `"${duplicate.dataSource.server.name}" 서버가 같은 Job Name·Targets(${settings.instance})를 이미 자동 등록했습니다.`,
+        });
+      }
+    }
+
     const prometheus = {
       url: settings.url,
       job: settings.job,
       instance: settings.instance,
       exporter,
+      autoScrape: settings.autoScrape,
     };
     // 토큰은 응답으로 돌려주지 않으므로, 새 값을 보냈을 때만 바꾸고 안 보내면 기존 값을 유지한다
     const resetToken = settings.target === 'MRDASH' || settings.clearToken;
@@ -307,16 +339,20 @@ export const testMonitoringDataSource = async (req, res) => {
       return fail(describePrometheusError(error));
     }
 
+    if (targets.length === 0 && settings.autoScrape) {
+      return fail('Prometheus에 아직 이 수집 대상이 없습니다. 자동 등록은 저장한 뒤 Prometheus가 목록을 다시 읽을 때(기본 1분마다) 반영되니, 저장 후 다시 테스트해주세요. '
+        + '그래도 없다면 Prometheus에 MRDash 자동 등록(http_sd_configs) 설정이 있는지 확인해주세요.');
+    }
     if (targets.length === 0) {
       return fail(settings.instance
         ? `job="${settings.job}", instance="${settings.instance}"에 해당하는 수집 대상이 없습니다. Job Name·Targets를 확인해주세요.`
         : `job="${settings.job}"에 해당하는 수집 대상이 없습니다. Job Name을 확인해주세요.`);
     }
     if (targets.every((t) => t.value[1] === '0')) {
-      return fail('수집 대상은 있지만 Prometheus가 exporter에서 지표를 가져오지 못하고 있습니다 (up=0). 서버와 플러그인 포트를 확인해주세요.');
+      return fail('수집 대상은 있지만 Prometheus가 exporter에서 지표를 가져오지 못하고 있습니다 (up=0). 서버와 Exporter 포트를 확인해주세요.');
     }
 
-    const probeMetric = exporter.metrics[exporter.probe].metric;
+    const probeMetric = exporter.probe;
     const exporterMetrics = await queryInstant(`${probeMetric}{${selector}}`, source).catch(() => []);
     if (exporterMetrics.length === 0) {
       return fail(`수집 대상은 있지만 ${exporter.label} 지표(${probeMetric})가 없습니다. ${exporter.label} 설치를 확인해주세요.`);
