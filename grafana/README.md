@@ -128,3 +128,13 @@ scrape_configs:
 - 외부 Prometheus를 쓰는 서버, Targets가 없는 서버는 목록에 넣지 않는다. 같은 Job Name·Targets를 두 서버가 자동 등록할 수는 없다(저장 시 409).
 - **기존에 `prometheus.yml`에 직접 적어 둔 서버에 자동 등록을 켜면 같은 대상을 두 번 수집**하므로, 켠 뒤에는 직접 적은 항목을 지운다.
 - backend가 응답하지 못하면(500·접속 실패) Prometheus는 마지막으로 받은 목록을 계속 쓴다.
+
+## 6. 호스트 전체 모니터링 직접 수집
+
+호스트 전체 CPU·메모리·네트워크는 Prometheus가 아니라 backend가 Linux 호스트의 `/proc/stat`, `/proc/meminfo`, `/proc/net/dev`를 읽어 측정한다. Docker 배포에서는 `docker-compose.yml`의 backend에 이 세 파일이 `/host-proc-stat`, `/host-proc-meminfo`, `/host-net-dev`로 읽기 전용 bind mount 되어 있어야 한다. Compose를 다시 올려 마운트를 적용한다.
+
+- 이 방식은 Linux Docker 호스트 기준이다. Windows/macOS 개발 환경이나 마운트가 허용되지 않는 배포에서는 호스트 지표를 읽지 못한다.
+- 실시간 샘플은 모니터링 화면을 보는 동안 1초 간격으로만 읽고, backend 메모리에 최근 10분을 둔다. 마지막 뷰어가 나가면 읽기를 멈추며, backend 재시작/화면을 모두 닫은 뒤에는 과거 샘플을 보존하지 않는다.
+- 호스트 전체 그래프는 Prometheus가 없어도 동작한다. 컨테이너 수와 컨테이너별 CPU·메모리·네트워크 패널만 기존 cAdvisor/Prometheus가 필요하다.
+- mount는 read-only지만 host procfs 파일을 backend 컨테이너에 공개한다. 필요한 세 파일만 mount하고 `/proc` 전체는 공유하지 않는다.
+- 호스트 네트워크 합계는 loopback 및 Docker/가상 인터페이스를 제외한다.
