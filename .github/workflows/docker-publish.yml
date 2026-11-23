@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   backend:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, mrdash]
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +35,7 @@ jobs:
             ghcr.io/doubledeltas/mrd-backend:${{ github.sha }}
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, mrdash]
     steps:
       - uses: actions/checkout@v4
 
@@ -57,7 +57,7 @@ jobs:
             ghcr.io/doubledeltas/mrd-frontend:${{ github.sha }}
 
   bridge:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, mrdash]
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +76,7 @@ jobs:
             ghcr.io/doubledeltas/mrd-bridge:${{ github.sha }}
 
   discord-bot:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, mrdash]
     steps:
       - uses: actions/checkout@v4
 
