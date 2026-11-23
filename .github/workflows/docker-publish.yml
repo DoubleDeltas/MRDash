@@ -93,3 +93,21 @@ jobs:
           tags: |
             ghcr.io/doubledeltas/mrd-discord-bot:latest
             ghcr.io/doubledeltas/mrd-discord-bot:${{ github.sha }}
+
+  # 이미지 빌드가 모두 끝나면 서버(/srv/mrdash)에서 update.sh로 pull + 재기동
+  deploy:
+    needs: [backend, frontend, bridge, discord-bot]
+    runs-on: [self-hosted, mrdash]
+    concurrency:
+      group: mrdash-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull images and restart containers
+        working-directory: /srv/mrdash
+        run: ./update.sh
