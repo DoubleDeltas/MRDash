@@ -116,7 +116,7 @@ scrape_configs:
     scrape_interval: 15s           # 30초 이하 (Prometheus Exporter 모드의 TPS가 [1m] 구간으로 계산된다)
     http_sd_configs:
       - url: http://mrdash-backend:3000/internal/prometheus/targets
-        refresh_interval: 5s       # 화면을 열고 닫을 때 1초↔15초 전환이 이 안에 반영된다
+        refresh_interval: 1m
         authorization:
           credentials_file: /etc/prometheus/mrdash-readonly-secret   # 내용: READONLY_API_SECRET 값
 ```
@@ -124,36 +124,17 @@ scrape_configs:
 - 인증은 `/internal` 공통 시크릿 — 조회만 하므로 `READONLY_API_SECRET`을 쓴다 (`INTERNAL_API_SECRET`도 동작).
 - `/internal`은 공용 nginx로 노출되지 않으므로 Prometheus가 `ddeltas-net`에서 `mrdash-backend:3000`에 직접 닿아야 한다.
 - Targets 주소는 **Prometheus 컨테이너에서** 닿는 주소여야 한다 (같은 docker 네트워크면 컨테이너 이름, 아니면 호스트 IP).
-- 설정을 저장하면 Prometheus가 다음 `refresh_interval`(위 예시는 5초) 안에 목록을 다시 읽는다. 그 전의 연결 테스트는 "아직 수집 대상이 없다"고 나온다.
+- 설정을 저장하면 Prometheus가 다음 `refresh_interval`(위 예시는 1분) 안에 목록을 다시 읽는다. 그 전의 연결 테스트는 "아직 수집 대상이 없다"고 나온다.
 - 외부 Prometheus를 쓰는 서버, Targets가 없는 서버는 목록에 넣지 않는다. 같은 Job Name·Targets를 두 서버가 자동 등록할 수는 없다(저장 시 409).
 - **기존에 `prometheus.yml`에 직접 적어 둔 서버에 자동 등록을 켜면 같은 대상을 두 번 수집**하므로, 켠 뒤에는 직접 적은 항목을 지운다.
 - backend가 응답하지 못하면(500·접속 실패) Prometheus는 마지막으로 받은 목록을 계속 쓴다.
 
-### 보는 사람이 있을 때만 1초 수집
+## 6. 호스트 전체 모니터링 직접 수집
 
-모니터링 화면을 보는 사람이 있는 동안 그 화면의 수집 대상만 **1초**마다 수집하고, 아무도 안 보면 job 기본값(위 예시 15초)으로 돌아간다.
+호스트 전체 CPU·메모리·네트워크는 Prometheus가 아니라 backend가 Linux 호스트의 `/proc/stat`, `/proc/meminfo`, `/proc/net/dev`를 읽어 측정한다. Docker 배포에서는 `docker-compose.yml`의 backend에 이 세 파일이 `/host-proc-stat`, `/host-proc-meminfo`, `/host-net-dev`로 읽기 전용 bind mount 되어 있어야 한다. Compose를 다시 올려 마운트를 적용한다.
 
-- `/monitoring` → 호스트 대상(아래 `PROMETHEUS_HOST_TARGETS`), `/monitoring/:serverId` → 그 서버의 자동 등록 대상.
-  외부 Prometheus를 쓰거나 자동 등록을 끈 서버는 MRDash가 수집 주기를 바꿀 수 없어 그대로다.
-- 화면이 백엔드와 WebSocket(`/ws/monitoring`, `/ws/monitoring/server`)을 열어 두는 동안 backend가 그 대상에
-  `__scrape_interval__: 1s`, `__scrape_timeout__: 1s` 라벨을 붙여 내보낸다 (`backend/src/util/scrapePresence.js`).
-  마지막 사람이 나간 뒤 30초 동안은 1초를 유지한다 (새로고침·재연결 때 오가지 않게).
-- 두 라벨은 `__` 내부 라벨이라 `job`·`instance`가 그대로여서 시계열은 끊기지 않는다.
-- **Prometheus 버전**: 대상별 `__scrape_interval__` 덮어쓰기를 지원해야 한다. 화면을 연 채로 Prometheus `/targets`에서
-  그 대상의 Scrape Interval이 `1s`로 바뀌는지 확인한다 — 안 바뀌면 Prometheus를 올린다.
-- 1초 수집 중에는 그 대상의 저장량과 Exporter 부하가 약 15배가 된다.
-
-**호스트 대상 옮기기** — node-exporter·cAdvisor가 `prometheus.yml`에 정적으로 적혀 있으면 수집 주기를 바꿀 수 없으므로
-같은 내용을 backend `.env`의 `PROMETHEUS_HOST_TARGETS`(HTTP SD 형식 JSON)로 옮긴다:
-
-```
-PROMETHEUS_HOST_TARGETS=[{"targets":["node-exporter:9100"],"labels":{"job":"node"}},{"targets":["cadvisor:8080"],"labels":{"job":"cadvisor"}}]
-```
-
-1. 지금 `prometheus.yml`의 호스트 job 이름(`job_name`)과 `targets`를 **똑같이** 적는다 — 같아야 기존 시계열·대시보드가 이어진다.
-   `relabel_configs`·`metrics_path` 등을 쓰고 있었다면 라벨로 옮기거나(`__metrics_path__`) 정적 설정을 유지한다.
-2. backend를 재시작하고 `/internal/prometheus/targets`에 호스트 그룹이 나오는지 확인한다.
-3. `prometheus.yml`에서 호스트 정적 설정을 **지우고** reload한다 — 둘 다 두면 같은 대상을 두 번 수집해 합계가 두 배가 된다.
-4. Prometheus `/targets`에서 호스트 대상이 `mrdash` job 아래 한 번씩만 있고 `job` 라벨이 이전과 같은지 확인한다.
-
-값이 없거나 JSON이 잘못되면 호스트 대상을 내보내지 않는다(backend 로그에 경고) — 정적 설정을 아직 안 옮긴 서버는 지금처럼 동작한다.
+- 이 방식은 Linux Docker 호스트 기준이다. Windows/macOS 개발 환경이나 마운트가 허용되지 않는 배포에서는 호스트 지표를 읽지 못한다.
+- 실시간 샘플은 모니터링 화면을 보는 동안 1초 간격으로만 읽고, backend 메모리에 최근 10분을 둔다. 마지막 뷰어가 나가면 읽기를 멈추며, backend 재시작/화면을 모두 닫은 뒤에는 과거 샘플을 보존하지 않는다.
+- 호스트 전체 그래프는 Prometheus가 없어도 동작한다. 컨테이너 수와 컨테이너별 CPU·메모리·네트워크 패널만 기존 cAdvisor/Prometheus가 필요하다.
+- mount는 read-only지만 host procfs 파일을 backend 컨테이너에 공개한다. 필요한 세 파일만 mount하고 `/proc` 전체는 공유하지 않는다.
+- 호스트 네트워크 합계는 loopback 및 Docker/가상 인터페이스를 제외한다.

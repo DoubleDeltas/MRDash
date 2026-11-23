@@ -1,7 +1,8 @@
 import { WebSocketServer } from 'ws';
 import { prisma } from '../config/prisma.js';
 import { getSessionUserFromRequest } from './sessionAuth.js';
-import { handleMonitoringConnection, handleServerMonitoringConnection } from './monitoringHub.js';
+import { handleMonitoringConnection } from './monitoringHub.js';
+import { parseRangeMinutes } from '../util/monitoringRange.js';
 
 // serverId -> 에이전트 ws 연결 (서버당 하나)
 const agentSockets = new Map();
@@ -129,25 +130,12 @@ export const attachConsoleHub = (httpServer) => {
         socket.destroy();
         return;
       }
-      wss.handleUpgrade(req, socket, head, (ws) => handleMonitoringConnection(ws));
-      return;
-    }
-
-    // 서버별 모니터링 화면을 보는 동안 그 서버의 Exporter를 1초마다 수집하게 하는 연결 (데이터는 Grafana 패널로 그린다).
-    // 서버별 모니터링 화면(pages/ServerMonitoring.jsx)과 같은 조건 — admin, 서버 소유자, 서버 관리자 (없는 서버면 거부)
-    if (url.pathname === '/ws/monitoring/server') {
-      const serverId = Number(url.searchParams.get('serverId'));
-      const user = await getSessionUserFromRequest(req);
-      if (!user || !Number.isInteger(serverId) || serverId <= 0 || !(await canAccessServer(user, serverId))) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-      wss.handleUpgrade(req, socket, head, (ws) => handleServerMonitoringConnection(ws, serverId));
+      wss.handleUpgrade(req, socket, head, (ws) => handleMonitoringConnection(ws, parseRangeMinutes(url.searchParams.get('range'))));
       return;
     }
 
     // 서버별 콘솔 — admin, 서버 소유자, 서버 관리자만 접근 가능
+    // (서버별 모니터링 그래프는 Grafana 패널로 그려서 WebSocket을 쓰지 않는다)
     const consoleMatch = url.pathname.match(/^\/ws\/console\/(\d+)$/);
     if (consoleMatch) {
       const serverId = Number(consoleMatch[1]);

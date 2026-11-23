@@ -182,6 +182,46 @@
   }
 }
 
+.host-metric-card {
+  min-width: 0;
+  padding: 1rem 1rem 0.75rem;
+  color: #f0efec;
+  background: #2f3136;
+  border: 1px solid #202225;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.host-metric-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem; }
+.host-metric-header h3 { margin: 0; color: #f0efec; font-size: 0.98rem; font-weight: 600; }
+.host-metric-header p { margin: 0.25rem 0 0; color: #b9bbbe; font-size: 0.78rem; }
+.host-metric-current { color: #f0efec; font-size: 1.25rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.host-metric-plot-wrap { position: relative; }
+.host-metric-plot { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; outline: none; }
+.host-metric-plot:focus-visible { border-radius: 4px; outline: 2px solid #86b6ef; outline-offset: 2px; }
+.host-metric-gridline { stroke: #494b50; stroke-width: 1; }
+.host-metric-axis-label { fill: #b9bbbe; font: 11px system-ui, sans-serif; }
+.host-metric-crosshair { stroke: #898781; stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.host-metric-tooltip { position: absolute; top: 0.5rem; right: 0.5rem; display: grid; gap: 0.25rem; padding: 0.5rem 0.65rem; color: #f0efec; background: rgba(24, 27, 31, 0.94); border: 1px solid #494b50; border-radius: 5px; font-size: 0.75rem; pointer-events: none; }
+.host-metric-tooltip strong { font-variant-numeric: tabular-nums; }
+.host-metric-tooltip span, .host-metric-legend span { display: flex; align-items: center; gap: 0.4rem; }
+.host-metric-tooltip i, .host-metric-legend i { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; }
+.host-metric-legend { display: flex; gap: 1rem; padding: 0.25rem 0 0.5rem; color: #d3d4d5; font-size: 0.78rem; }
+.host-metric-table-wrap { margin-top: 0.5rem; color: #d3d4d5; font-size: 0.78rem; }
+.host-metric-table-wrap summary { cursor: pointer; color: #b9bbbe; }
+.host-metric-table-scroll { max-height: 220px; overflow: auto; margin-top: 0.5rem; }
+.host-metric-table-scroll table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; text-align: right; }
+.host-metric-table-scroll caption { padding: 0.35rem; color: #b9bbbe; text-align: left; }
+.host-metric-table-scroll th, .host-metric-table-scroll td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #494b50; white-space: nowrap; }
+.host-metric-table-scroll th:first-child { text-align: left; }
+.host-metric-table-scroll thead th { position: sticky; top: 0; background: #2f3136; }
+
+@media (max-width: 600px) {
+  .host-metric-card { padding-inline: 0.65rem; }
+  .host-metric-header { flex-wrap: wrap; }
+  .host-metric-current { font-size: 1.05rem; }
+  .host-metric-tooltip { top: auto; bottom: 2.3rem; right: 0.25rem; }
+}
+
 .monitoring-chart-card {
   background: #2F3136;
   border: 1px solid #202225;

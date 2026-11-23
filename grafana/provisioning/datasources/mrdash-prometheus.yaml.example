@@ -15,5 +15,5 @@ datasources:
     url: http://prometheus:9090   # ddeltas-net에서 Grafana가 닿는 Prometheus 주소
     isDefault: true
     jsonData:
-      timeInterval: 1s            # MRDash는 화면 시청 중 일부 대상을 1초로 수집 (grafana/README.md 5절)
+      timeInterval: 15s           # Prometheus scrape_interval과 맞춘다
     editable: false
