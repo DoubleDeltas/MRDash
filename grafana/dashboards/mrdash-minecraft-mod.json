@@ -328,7 +328,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "avg(clamp_max(rate(mc_server_tick_seconds_count{job=\"$job\", instance=~\"$instance\"}[$__rate_interval]) / rate(mc_server_tick_seconds_sum{job=\"$job\", instance=~\"$instance\"}[$__rate_interval]), 20))",
+          "expr": "(avg(clamp_max(rate(mc_server_tick_seconds_count{job=\"$job\", instance=~\"$instance\"}[$__rate_interval]) / rate(mc_server_tick_seconds_sum{job=\"$job\", instance=~\"$instance\"}[$__rate_interval]), 20))) or (avg(clamp_max(irate(mc_server_tick_seconds_count{job=\"$job\", instance=~\"$instance\"}[1m]) / irate(mc_server_tick_seconds_sum{job=\"$job\", instance=~\"$instance\"}[1m]), 20)))",
           "legendFormat": "TPS"
         }
       ],
