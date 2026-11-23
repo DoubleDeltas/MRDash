@@ -60,7 +60,7 @@ export const DEFAULT_RANGE = '10m'
 
 // 기간이 길수록 그래프를 덜 자주 새로 그린다 (Grafana refresh)
 const refreshFor = (ms) => {
-  if (ms <= 10 * MINUTE) return '5s'
+  if (ms <= 10 * MINUTE) return '15s'
   if (ms <= 30 * MINUTE) return '30s'
   if (ms <= DAY) return '1m'
   if (ms <= 31 * DAY) return '5m'

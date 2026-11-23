@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react'
 import { WS_BASE_URL } from '../api/client'
 import GrafanaPanel from '../components/GrafanaPanel'
 import { GRAFANA_DASHBOARDS, grafanaPanelUrl } from '../components/grafana'
-import MonitoringRangeSelect, { DEFAULT_RANGE, resolveRange } from '../components/MonitoringRangeSelect'
+import MonitoringRangeSelect, { DEFAULT_RANGE, formatRefresh, resolveRange } from '../components/MonitoringRangeSelect'
 import './Monitoring.css'
 
-// /ws/monitoring이 보내는 최신 KPI point에 화면용 시간 라벨을 붙인다.
-const decoratePoint = (point) => ({
-  ...point,
-  time: new Date(point.timestamp).toTimeString().slice(0, 5),
-})
+// 백엔드 /ws/monitoring 스트림의 point에 화면용 시간 라벨을 붙인다 (KPI 타일용)
+const decoratePoints = (points) => points.map(p => ({
+  ...p,
+  time: new Date(p.timestamp).toTimeString().slice(0, 5),
+}))
 
 function Monitoring() {
   const [viewMode, setViewMode] = useState('total') // 'total' | 'container'
@@ -36,8 +36,8 @@ function Monitoring() {
           return
         }
 
-        if (msg.type === 'latest') {
-          setMetrics({ data: [decoratePoint(msg.point)], memTotal: msg.memTotal })
+        if (msg.type === 'metrics') {
+          setMetrics({ data: decoratePoints(msg.points), memTotal: msg.memTotal })
           setStatus('ok')
         } else if (msg.type === 'unavailable') {
           setStatus('unavailable')
@@ -78,7 +78,7 @@ function Monitoring() {
     )
   }
 
-  if (data.length === 0) {
+  if (data.length < 2) {
     return (
       <div className="monitoring-page">
         <div className="monitoring-status-card">
@@ -163,7 +163,7 @@ function Monitoring() {
         <div className="control-actions">
           <span className={`live-indicator ${status === 'ok' ? '' : 'live-indicator-off'}`}>
             <span className="live-dot" />
-            {status === 'ok' ? '실시간 (1초 주기)' : '불러오는 중...'}
+            {status === 'ok' ? `실시간 (${formatRefresh(range.refresh)} 주기)` : '불러오는 중...'}
           </span>
         </div>
       </div>
