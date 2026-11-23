@@ -101,7 +101,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval])))",
+          "expr": "(100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval])))) or (100 * (1 - avg(irate(node_cpu_seconds_total{mode=\"idle\"}[1m]))))",
           "legendFormat": "CPU"
         }
       ]
@@ -284,7 +284,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name!=\"\"}[$__rate_interval])) * 100 / scalar(count(node_cpu_seconds_total{mode=\"idle\"}))",
+          "expr": "(sum by (name) (rate(container_cpu_usage_seconds_total{name!=\"\"}[$__rate_interval])) * 100 / scalar(count(node_cpu_seconds_total{mode=\"idle\"}))) or (sum by (name) (irate(container_cpu_usage_seconds_total{name!=\"\"}[1m])) * 100 / scalar(count(node_cpu_seconds_total{mode=\"idle\"})))",
           "legendFormat": "{{name}}"
         }
       ]
@@ -446,7 +446,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|cni.*|flannel.*|cali.*|tun.*|tap.*\"}[$__rate_interval])) * 8",
+          "expr": "(sum(rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|cni.*|flannel.*|cali.*|tun.*|tap.*\"}[$__rate_interval])) * 8) or (sum(irate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|cni.*|flannel.*|cali.*|tun.*|tap.*\"}[1m])) * 8)",
           "legendFormat": "수신"
         },
         {
@@ -455,7 +455,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|cni.*|flannel.*|cali.*|tun.*|tap.*\"}[$__rate_interval])) * 8",
+          "expr": "(sum(rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|cni.*|flannel.*|cali.*|tun.*|tap.*\"}[$__rate_interval])) * 8) or (sum(irate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|cni.*|flannel.*|cali.*|tun.*|tap.*\"}[1m])) * 8)",
           "legendFormat": "송신"
         }
       ],
@@ -527,7 +527,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (name) (rate(container_network_receive_bytes_total{name!=\"\"}[$__rate_interval]) + rate(container_network_transmit_bytes_total{name!=\"\"}[$__rate_interval])) * 8",
+          "expr": "(sum by (name) (rate(container_network_receive_bytes_total{name!=\"\"}[$__rate_interval]) + rate(container_network_transmit_bytes_total{name!=\"\"}[$__rate_interval])) * 8) or (sum by (name) (irate(container_network_receive_bytes_total{name!=\"\"}[1m]) + irate(container_network_transmit_bytes_total{name!=\"\"}[1m])) * 8)",
           "legendFormat": "{{name}}"
         }
       ],

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { apiClient } from '../api/client'
+import { apiClient, WS_BASE_URL } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import GrafanaPanel from '../components/GrafanaPanel'
 import { GRAFANA_DASHBOARDS, grafanaPanelUrl, serverDatasourceUid } from '../components/grafana'
@@ -30,6 +30,31 @@ function ServerMonitoring() {
       .then(res => setServer(res.data.data))
       .catch(() => setLoadError(true))
   }, [serverId])
+
+  // MRDash Prometheus의 자동 등록 대상만 시청 중 1초로 수집한다. 서버 정보가 바뀌면 기존 신호를 닫는다.
+  useEffect(() => {
+    const canView = user?.role === 'ADMIN' || server?.ownerId === user?.id || Boolean(user && server?.managerIds?.includes(user.id))
+    if (!server || !canView || server.monitoringDataSource !== 'PROMETHEUS' || !server.prometheusAutoScrape) return undefined
+
+    let cancelled = false
+    let reconnectTimer = null
+    let ws = null
+    const connect = () => {
+      if (cancelled) return
+      ws = new WebSocket(`${WS_BASE_URL}/ws/monitoring/server?serverId=${encodeURIComponent(serverId)}`)
+      ws.onclose = () => {
+        if (!cancelled) reconnectTimer = setTimeout(connect, 2000)
+      }
+      ws.onerror = () => ws.close()
+    }
+    connect()
+
+    return () => {
+      cancelled = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      ws?.close()
+    }
+  }, [server, serverId, user])
 
   if (loadError) {
     return (
