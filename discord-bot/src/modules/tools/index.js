@@ -1,11 +1,13 @@
 import { Events, MessageFlags } from 'discord.js';
 import { config } from '../../config.js';
 import math from './math.js';
-import { warmUp } from './tex-renderer.js';
+import dice from './dice.js';
+import { warmUp as warmUpTex } from './tex-renderer.js';
+import { warmUp as warmUpDice } from './dice-engine.js';
 
 // "테트라" 도구 모음 — 슬래시 명령 하나가 도구 하나.
 // 새 도구는 이 폴더에 { data: SlashCommandBuilder, execute(interaction) } 형태로 만들고 아래 목록에 추가한다.
-const tools = [math];
+const tools = [math, dice];
 
 const toolByName = new Map(tools.map((tool) => [tool.data.name, tool]));
 
@@ -38,7 +40,9 @@ export default {
   name: 'tools',
   register(client) {
     client.once(Events.ClientReady, registerCommands);
-    warmUp().catch((error) => console.error('❌ 수식 렌더러 준비 실패:', error));
+    // 첫 명령이 디스코드 응답 제한(3초)을 넘지 않도록 무거운 엔진을 미리 준비한다
+    warmUpTex().catch((error) => console.error('❌ 수식 렌더러 준비 실패:', error));
+    warmUpDice().catch((error) => console.error('❌ 주사위 엔진 준비 실패:', error));
 
     client.on(Events.InteractionCreate, async (interaction) => {
       if (!interaction.isChatInputCommand()) return;
