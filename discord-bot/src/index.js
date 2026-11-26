@@ -3,9 +3,10 @@ import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { config } from './config.js';
 import membership from './modules/membership/index.js';
 import channels from './modules/channels/index.js';
+import tools from './modules/tools/index.js';
 
 // 기능 모듈 목록. 새 기능(자동응답, 미니게임 등)은 modules/에 만들고 여기에 추가한다.
-const modules = [membership, channels];
+const modules = [membership, channels, tools];
 
 const client = new Client({
   intents: [
