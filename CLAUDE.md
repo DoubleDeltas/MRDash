@@ -79,6 +79,8 @@ frontend:
 - **알림 채널 목록** (`modules/channels`): 봇이 볼 수 있고 메시지를 보낼 수 있는 텍스트 채널 목록을 시작 시·채널/역할 변경 시·10분마다 `PUT /internal/discord-channels`로 보낸다. backend는 Redis(`mrdash:discord-channels`)에 보관하고, 서버별 모니터링 알림 설정(`/settings/alert/:serverId`)의 "마랜디 채널" 목록으로 쓴다.
 - MRDash Prometheus는 `READONLY_API_SECRET`으로 `GET /internal/prometheus/targets`(http_sd, 서버 설정에서 "수집 대상 자동 등록"을 켠 서버 목록)를 읽는다 — 설정은 `grafana/README.md` 5절.
 - 마랜디위키는 `READONLY_API_SECRET`으로 `GET /internal/members/:discordId`(인증 여부 조회)만 호출한다 (`ddeltas-net`에서 `mrdash-backend:3000`에 직접 접근). 읽기 전용 시크릿으로 쓰기 요청 시 403.
+- **도구 모음** (`modules/tools`): 슬래시 명령 하나가 도구 하나. 시작 시 "마랜디" 길드 명령으로 등록(`guild.commands.set` — 목록 통째로 덮어씀). 새 도구는 `{ data: SlashCommandBuilder, execute(interaction) }`로 만들어 `tools/index.js`의 `tools`에 추가.
+  - `/수식 <katex>`: TeX → MathJax SVG → resvg PNG. 흰 글씨 + 디스코드 다크 배경(`#313338`). 색을 바꾸는 `\color`·`\bbox`·`\style` 등과 `\require`는 막아 둠. `\text{}` 한글은 이미지에 설치한 `fonts-nanum`으로 그린다.
 - 기능은 `src/modules/<이름>/`에 `{ name, register(client) }` 형태로 만들고 `src/index.js`의 `modules`에 추가.
 - 환경변수: backend와 같은 서버의 `.env` 하나를 공유 (`.env.example`의 discord-bot 항목 참고). `BACKEND_INTERNAL_URL`은 기본값이 운영(`NODE_ENV=production`)이면 `http://mrdash-backend:3000/internal`, 로컬이면 `http://localhost:$PORT/internal`이라 보통 생략. Developer Portal에서 **Server Members Intent** 활성화 필요.
 
