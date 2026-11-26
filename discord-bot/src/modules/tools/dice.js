@@ -33,10 +33,10 @@ const formatResult = (expression, result) => {
 export default {
   data: new SlashCommandBuilder()
     .setName('주사위')
-    .setDescription('주사위를 굴립니다. CoC 7판(CC<=50, CC(2)<=50) 및 BCDice 문법을 지원합니다.')
+    .setDescription('주사위를 굴립니다. DX3rd(2DX7), CoC 7판(CC<=50), 범용 BCDice 문법을 지원합니다.')
     .addStringOption((option) => option
       .setName('dice_expr')
-      .setDescription('주사위 식 (예: CC<=50, CBR(50,20), 3d6+1, x3 2D6, S2D6은 비밀 굴림)')
+      .setDescription('주사위 식 (예: 2DX7+3, 10dx+5@8, CC<=50, 3d6+1, x3 2D6, S2D6은 비밀 굴림)')
       .setRequired(true)
       .setMaxLength(MAX_INPUT_LENGTH)),
 
