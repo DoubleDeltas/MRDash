@@ -1,9 +1,8 @@
 import bcdice from 'bcdice';
 
-// CoC 7판 한국어판을 먼저 시도하고, 해당 시스템에서 인식하지 못하면 범용 DiceBot으로 넘긴다.
-// 범용 문법: https://docs.bcdice.org/command/
-// CoC 7판: CC(보너스/페널티)<=기능치, CC<=기능치h/e/r/c, CBR(x,y), FAR(...), 광기/공포증/집착증 표 등.
-// DiceBot: 가산 다이스, 바라바라, 추가/무한 굴림, 집계, D66, 계산, 선택, 반복, 시크릿, BCDiceVersion 등.
+// CoC 7판 한국어판 → 더블크로스 3판 한국어판 순으로 시도하고, 둘 다 인식하지 못하면 범용 DiceBot으로 넘긴다.
+// DX3rd: xDX+y@c 또는 xDXc+y, 감정표/해프닝차트 등. CoC 7판: CC(보너스/페널티)<=기능치, CC<=기능치h/e/r/c, CBR, FAR 등.
+// 범용 문법: https://docs.bcdice.org/command/ (가산 다이스, B/R/U/TY/TZ, D66, 계산, 선택, 반복, 시크릿, BCDiceVersion 등).
 
 const { DynamicLoader } = bcdice;
 
@@ -13,16 +12,23 @@ let gameSystemsPromise = null;
 const loadGameSystems = () => {
   gameSystemsPromise ??= (async () => {
     const loader = new DynamicLoader();
-    const [coc7, diceBot] = await Promise.all([
+    const [coc7, doubleCross3, diceBot] = await Promise.all([
       loader.dynamicLoad('Cthulhu7th:Korean'),
+      loader.dynamicLoad('DoubleCross:Korean'),
       loader.dynamicLoad('DiceBot'),
     ]);
-    return [coc7, diceBot];
+    // 범용 식(2D6+1, D66 등)은 목록에서 먼저 인식한 시스템이 처리한다 — CoC 7판을 앞에 두어 기존 결과를 유지.
+    return { default: [coc7, doubleCross3, diceBot], doubleCross: [doubleCross3, coc7, diceBot] };
   })();
   return gameSystemsPromise;
 };
 
-const evaluate = (systems, expression) => {
+// DX 전용 명령(2DX7, ET, HC 등). 반복(x3 2DX7)은 CoC 엔진이 반복 접두어를 먼저 잡고
+// 안쪽 명령을 몰라 오류 결과를 돌려주므로, DX 명령이면 DX3 엔진부터 시도한다.
+const DOUBLE_CROSS_COMMAND = /^S?(?:(?:repeat|rep|x)\d+\s+)?S?(?:\d+DX|ET|HC|PCP|PCN)/i;
+
+const evaluate = (systemSets, expression) => {
+  const systems = DOUBLE_CROSS_COMMAND.test(expression) ? systemSets.doubleCross : systemSets.default;
   for (const system of systems) {
     const result = system.eval(expression);
     if (result) return result;
@@ -64,10 +70,10 @@ const translate = (text) => TRANSLATIONS.reduce(
  * @throws {DiceError} 인식할 수 없거나 처리할 수 없는 식
  */
 export async function rollDice(expression) {
-  const systems = await loadGameSystems();
+  const systemSets = await loadGameSystems();
   let result;
   try {
-    result = evaluate(systems, expression);
+    result = evaluate(systemSets, expression);
   } catch {
     // 주사위 개수가 너무 많은 식 등은 엔진이 메시지 없이 예외를 던진다.
     throw new DiceError('주사위 식을 처리할 수 없습니다. 주사위 개수나 값이 너무 크지 않은지 확인하세요.');
