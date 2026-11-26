@@ -11,15 +11,26 @@ const tools = [math, dice];
 
 const toolByName = new Map(tools.map((tool) => [tool.data.name, tool]));
 
-// 길드 명령으로 등록해 변경이 즉시 반영되게 한다 (전역 명령은 전파에 시간이 걸린다).
-// set()은 길드의 명령 목록을 통째로 덮어쓰므로, 목록에서 뺀 도구는 자동으로 지워진다.
+// 전역 명령으로 등록해 봇이 들어간 모든 서버(와 봇 DM)에서 쓸 수 있게 한다.
+// 봇을 새 서버에 초대해도 재등록할 필요가 없다.
+// set()은 전역 명령 목록을 통째로 덮어쓰므로, 목록에서 뺀 도구는 자동으로 지워진다.
 const registerCommands = async (client) => {
   try {
-    const guild = await client.guilds.fetch(config.guildId);
-    await guild.commands.set(tools.map((tool) => tool.data.toJSON()));
-    console.log(`✅ 도구 명령 등록: ${tools.map((tool) => `/${tool.data.name}`).join(', ')}`);
+    await client.application.commands.set(tools.map((tool) => tool.data.toJSON()));
+    console.log(`✅ 도구 명령 전역 등록: ${tools.map((tool) => `/${tool.data.name}`).join(', ')}`);
   } catch (error) {
     console.error('❌ 도구 명령 등록 실패:', error);
+  }
+
+  // 예전에는 "마랜디" 길드 명령으로 등록했다. 남아 있으면 그 서버에서 명령이 두 번씩 보이므로 지운다.
+  try {
+    const guild = await client.guilds.fetch(config.guildId);
+    if ((await guild.commands.fetch()).size > 0) {
+      await guild.commands.set([]);
+      console.log('🧹 예전 길드 명령 삭제');
+    }
+  } catch (error) {
+    console.error('❌ 예전 길드 명령 삭제 실패:', error.message);
   }
 };
 
