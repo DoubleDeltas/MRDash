@@ -17,8 +17,10 @@ const summarize = (text) => {
   return `최종: ${escapeCode(rounds.map((round) => finalPart(round)).join(', ')).slice(0, 1500)}`;
 };
 
-const formatResult = (expression, result) => {
-  const header = `🎲 \`${escapeCode(expression)}\``;
+// roller는 굴린 사람(User) — 멘션으로 넣으면 디스코드가 "@표시 이름"으로 보여준다.
+// 알림이 가지 않도록 보낼 때 allowedMentions: { parse: [] }를 함께 쓴다.
+const formatResult = (roller, expression, result) => {
+  const header = `🎲 ${roller}: \`${escapeCode(expression)}\``;
   if (result.text.length <= MAX_RESULT_LENGTH) {
     return { content: `${header}\n\`\`\`\n${escapeCode(result.text)}\n\`\`\``, files: [] };
   }
@@ -52,9 +54,9 @@ export default {
       return;
     }
 
-    const message = formatResult(expression, result);
+    const message = { ...formatResult(interaction.user, expression, result), allowedMentions: { parse: [] } };
     if (!result.secret) {
-      await interaction.reply({ ...message, allowedMentions: { parse: [] } });
+      await interaction.reply(message);
       return;
     }
 
