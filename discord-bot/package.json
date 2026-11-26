@@ -17,6 +17,7 @@
   "license": "ISC",
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
+    "bcdice": "^4.10.0",
     "discord.js": "^14.27.0",
     "dotenv": "^16.6.1",
     "mathjax-full": "^3.2.2"
