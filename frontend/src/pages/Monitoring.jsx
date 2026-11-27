@@ -13,8 +13,15 @@ const decoratePoints = (points) => points.map((point) => ({
 
 const HOST_COLORS = { blue: '#3987e5', green: '#199e70', orange: '#e8a33d' }
 
+// 'hostLive': procfs 직접 수집(1초, 최근 10분) / 'hostPrometheus'·'container': Grafana 패널 (기간 선택)
+const VIEW_MODES = [
+  { id: 'hostLive', label: '호스트 (실시간)' },
+  { id: 'hostPrometheus', label: '호스트 (Prometheus)' },
+  { id: 'container', label: 'Docker 컨테이너별' },
+]
+
 function Monitoring() {
-  const [viewMode, setViewMode] = useState('total')
+  const [viewMode, setViewMode] = useState('hostLive')
   const [containerStatus, setContainerStatus] = useState('connecting')
   const [hostStatus, setHostStatus] = useState('connecting')
   const [hostHistory, setHostHistory] = useState([])
@@ -68,8 +75,8 @@ function Monitoring() {
     }
   }, [])
 
-  const range = resolveRange(rangeId)
-  const containerRange = { from: range.from, to: range.to, refresh: range.refresh }
+  const grafanaRange = resolveRange(rangeId)
+  const usesGrafana = viewMode !== 'hostLive'
   const current = hostHistory.at(-1) || {}
   const memoryRatio = current.totalGb ? (current.usedGb || 0) / current.totalGb : 0
   const chartSeries = (key, label, color) => [{
@@ -78,7 +85,7 @@ function Monitoring() {
     values: hostHistory.filter((point) => Number.isFinite(point[key])).map((point) => ({ timestamp: point.timestamp, value: point[key] })),
   }]
   const grafanaPanel = (key, title, wide = false) => (
-    <GrafanaPanel key={key} title={title} wide={wide} src={grafanaPanelUrl(GRAFANA_DASHBOARDS.host, GRAFANA_DASHBOARDS.host.panels[key], { range: containerRange })} />
+    <GrafanaPanel key={key} title={title} wide={wide} src={grafanaPanelUrl(GRAFANA_DASHBOARDS.host, GRAFANA_DASHBOARDS.host.panels[key], { range: grafanaRange })} />
   )
 
   return (
@@ -110,21 +117,35 @@ function Monitoring() {
 
       <div className="monitoring-controls-bar">
         <div className="control-groups">
-          <div className="control-group"><label htmlFor="view-mode-select" className="control-label">보기 모드</label><select id="view-mode-select" value={viewMode} onChange={(event) => setViewMode(event.target.value)} className="monitoring-select"><option value="total">호스트 전체</option><option value="container">컨테이너별</option></select></div>
-          {viewMode === 'container' && <MonitoringRangeSelect value={rangeId} onChange={setRangeId} />}
+          <div className="control-group"><label htmlFor="view-mode-select" className="control-label">보기 모드</label><select id="view-mode-select" value={viewMode} onChange={(event) => setViewMode(event.target.value)} className="monitoring-select">{VIEW_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}</select></div>
+          {usesGrafana && <MonitoringRangeSelect value={rangeId} onChange={setRangeId} />}
         </div>
-        <div className="control-actions"><span className={`live-indicator ${hostStatus === 'ok' ? '' : 'live-indicator-off'}`}><span className="live-dot" />{hostStatus === 'ok' ? '호스트 실시간 (1초)' : '호스트 지표 연결 중...'}</span></div>
+        <div className="control-actions">
+          {usesGrafana
+            ? <span className="live-indicator"><span className="live-dot" />Grafana ({formatRefresh(grafanaRange.refresh)} 갱신)</span>
+            : <span className={`live-indicator ${hostStatus === 'ok' ? '' : 'live-indicator-off'}`}><span className="live-dot" />{hostStatus === 'ok' ? '호스트 실시간 (1초)' : '호스트 지표 연결 중...'}</span>}
+        </div>
       </div>
 
-      {viewMode === 'total' ? (
+      {viewMode === 'hostLive' && (
         <div className="monitoring-charts-grid">
           <HostMetricChart title="호스트 CPU 사용률" series={chartSeries('cpuPercent', 'CPU', HOST_COLORS.blue)} unit="%" kind="percent" description="호스트 OS에서 직접 측정 · 최근 10분" />
           <HostMetricChart title="호스트 메모리 사용량" series={chartSeries('usedGb', '사용 중', HOST_COLORS.green)} unit="GB" kind="memory" description="MemTotal − MemAvailable · 최근 10분" />
           <HostMetricChart title="호스트 네트워크 트래픽" series={[{ label: '수신', color: HOST_COLORS.blue, values: chartSeries('receiveBps', '수신', HOST_COLORS.blue)[0].values }, { label: '송신', color: HOST_COLORS.orange, values: chartSeries('transmitBps', '송신', HOST_COLORS.orange)[0].values }]} unit="bit/s" kind="network" description="가상·loopback 인터페이스 제외 · 최근 10분" />
         </div>
-      ) : (
+      )}
+
+      {viewMode === 'hostPrometheus' && (
         <section className="monitoring-section">
-          <h3 className="monitoring-section-title">컨테이너별 지표 · Prometheus</h3>
+          <h3 className="monitoring-section-title">호스트 전체 지표 · Prometheus</h3>
+          {containerStatus === 'unavailable' && <div className="monitoring-status-card monitoring-status-error"><span className="material-icons">cloud_off</span>Prometheus가 연결되지 않았습니다. 실시간 호스트 그래프는 "호스트 (실시간)"에서 볼 수 있습니다.</div>}
+          <div className="monitoring-charts-grid">{grafanaPanel('cpu', 'CPU 부하 (전체)')}{grafanaPanel('memory', '사용 중인 메모리 (전체)')}{grafanaPanel('network', '네트워크 트래픽 (전체)', true)}</div>
+        </section>
+      )}
+
+      {viewMode === 'container' && (
+        <section className="monitoring-section">
+          <h3 className="monitoring-section-title">Docker 컨테이너별 지표 · Prometheus</h3>
           {containerStatus === 'unavailable' && <div className="monitoring-status-card monitoring-status-error"><span className="material-icons">cloud_off</span>컨테이너별 지표는 Prometheus가 연결돼 있어야 볼 수 있습니다. 호스트 전체 그래프는 직접 수집으로 계속 동작합니다.</div>}
           {containerStatus === 'connecting' && <div className="monitoring-status-card"><span className="material-icons">hourglass_empty</span>컨테이너 지표를 불러오는 중입니다...</div>}
           <div className="monitoring-charts-grid">{grafanaPanel('containerCpu', 'CPU 부하 (컨테이너별 누적)')}{grafanaPanel('containerMemory', '사용 중인 메모리 (컨테이너별 누적)')}{grafanaPanel('containerNetwork', '네트워크 트래픽 (컨테이너별 누적)', true)}</div>
